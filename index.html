@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeShift — Think together. Code without limits.</title>
+  <meta name="description" content="Instant real-time collaborative code editor. Zero setup, multi-language support, live execution, and seamless sharing.">
+  <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- PrismJS for syntax highlighting fallback & tokenization -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" integrity="sha512-VSXL89b4zXJtS4953mP5e3b97b10ff569b36d0b67bfad81d4a04d2e7b8f9e6d" crossorigin="anonymous" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-base text-main font-sans antialiased overflow-x-hidden selection:bg-violet-500/30 selection:text-white">
+
+  <!-- Ambient Glows -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- App Root -->
+  <div id="app" class="relative z-10 min-h-screen flex flex-col">
+
+    <!-- Top Navigation -->
+    <header class="border-b border-border-dim bg-surface/70 backdrop-blur-md sticky top-0 z-30 transition-all duration-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        
+        <!-- Brand Logo -->
+        <a href="#/" id="brand-logo" class="flex items-center gap-3 group focus:outline-none">
+          <div class="w-10 h-10 rounded-xl bg-surface-elevated border border-border-highlight flex items-center justify-center p-1.5 shadow-lg shadow-violet-950/40 group-hover:border-violet-500/60 group-hover:scale-105 transition-all">
+            <svg viewBox="0 0 64 64" class="w-full h-full" fill="none">
+              <path d="M22 20L12 32L22 44" stroke="url(#navGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M42 20L52 32L42 44" stroke="url(#navGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M32 17L25 26H29V41C29 42 29.8 43 31 43H33C34.2 43 35 42 35 41V26H39L32 17Z" fill="url(#navShift)"/>
+              <defs>
+                <linearGradient id="navGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#6366F1"/>
+                  <stop offset="100%" stop-color="#38BDF8"/>
+                </linearGradient>
+                <linearGradient id="navShift" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#C084FC"/>
+                  <stop offset="100%" stop-color="#8B7CFF"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-xl font-extrabold tracking-tight text-white">Code<span class="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-400">Shift</span></span>
+            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live
+            </span>
+          </div>
+        </a>
+
+        <!-- Room Header Controls (Dynamic when in room) -->
+        <div id="room-nav-controls" class="hidden items-center gap-3">
+          
+          <!-- Room ID badge with 1-click copy -->
+          <button id="btn-copy-room-link" class="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-elevated hover:bg-surface-elevated/80 border border-border-dim hover:border-violet-500/50 text-xs font-mono text-zinc-300 hover:text-white transition-all shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="room-nav-id" class="font-semibold">room-123</span>
+            <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+            </svg>
+          </button>
+
+          <!-- Active Peers Indicator -->
+          <div id="peer-avatars" class="flex items-center -space-x-2 overflow-hidden pl-1">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Nickname Badge (clickable to change) -->
+          <button id="btn-change-nickname" title="Change your username" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border-dim text-xs font-medium text-zinc-300 hover:text-white hover:border-border-highlight transition-all">
+            <span class="text-violet-400">👤</span>
+            <span id="user-nickname-display">You</span>
+          </button>
+        </div>
+
+        <!-- Global Right Actions -->
+        <div class="flex items-center gap-3">
+          <!-- Room Action Trigger -->
+          <button id="nav-btn-instant-room" class="btn-primary text-xs sm:text-sm px-3.5 py-1.5 rounded-lg font-semibold flex items-center gap-2 shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 transition-all">
+            <span>New Room</span>
+            <span class="text-violet-200">↗</span>
+          </button>
+
+          <!-- Theme Dropdown -->
+          <select id="select-theme" class="bg-surface-elevated text-xs text-zinc-300 border border-border-dim rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-violet-500">
+            <option value="codeshift">CodeShift Violet</option>
+            <option value="obsidian">Obsidian Dark</option>
+            <option value="cyberpunk">Cyber Neon</option>
+            <option value="tokyo">Tokyo Twilight</option>
+            <option value="light">Paper Light</option>
+          </select>
+
+          <!-- Settings Trigger -->
+          <button id="btn-open-settings" title="Settings" class="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-surface-elevated transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN VIEW CONTAINER -->
+    <main class="flex-1 flex flex-col">
+
+      <!-- ============================================== -->
+      <!-- VIEW 1: LANDING & ROOM LAUNCHER               -->
+      <!-- ============================================== -->
+      <section id="view-landing" class="flex-1 flex flex-col justify-center">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16 w-full">
+          
+          <!-- Hero Section -->
+          <div class="text-center max-w-3xl mx-auto space-y-6">
+            
+            <!-- Launch Badge -->
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-300 border border-violet-500/20 shadow-sm animate-fade-in">
+              <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+              <span>Next-Gen Collaborative Code Editor</span>
+              <span class="text-zinc-500">•</span>
+              <span class="text-cyan-400">Zero Signup</span>
+            </div>
+
+            <!-- Big Tagline -->
+            <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
+              Think together.<br/>
+              <span class="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-400 glow-text">Code without limits.</span>
+            </h1>
+
+            <p class="text-base sm:text-xl text-zinc-400 font-normal leading-relaxed max-w-2xl mx-auto">
+              Share code instantly, pair program in real time, and execute snippets right in the browser. One link. Zero friction.
+            </p>
+
+            <!-- Room Action Card -->
+            <div class="pt-4 max-w-md mx-auto">
+              <div class="p-2 sm:p-2.5 rounded-2xl bg-surface/90 border border-border-dim shadow-2xl backdrop-blur-xl flex flex-col sm:flex-row gap-2">
+                <input 
+                  type="text" 
+                  id="input-custom-room" 
+                  placeholder="Enter or create room name..." 
+                  class="flex-1 bg-surface-elevated/70 border border-border-dim rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 font-mono focus:outline-none focus:border-violet-500 transition-all"
+                  autocomplete="off"
+                />
+                <button 
+                  id="btn-create-or-join" 
+                  class="btn-primary px-6 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
+                >
+                  <span>Launch Room</span>
+                  <span>⚡</span>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between px-3 pt-3 text-xs text-zinc-500 font-mono">
+                <span>Try instant: <button id="btn-quick-sample-room" class="text-violet-400 hover:underline">#shift-demo</button></span>
+                <span>Peer-to-peer sync enabled</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Hero Live Coding Teaser -->
+          <div class="mt-14 max-w-4xl mx-auto rounded-2xl border border-border-dim bg-surface/80 shadow-2xl overflow-hidden backdrop-blur-sm">
+            <!-- Mock Editor Header -->
+            <div class="bg-surface-elevated/90 px-4 py-3 border-b border-border-dim flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+                <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+                <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+                <span class="ml-2 text-xs font-mono text-zinc-400">codeshift.dev/room/pair-session</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping"></span>
+                  2 active developers
+                </span>
+                <span class="text-xs text-zinc-500 font-mono">main.ts</span>
+              </div>
+            </div>
+
+            <!-- Code Preview Body with Simulated Dual Cursor -->
+            <div class="p-6 font-mono text-sm leading-relaxed overflow-x-auto bg-[#0d0e15] relative select-none">
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">01</span>
+                <span class="text-purple-400">import</span> <span class="text-zinc-200">{</span> <span class="text-cyan-300">CodeShift</span>, <span class="text-cyan-300">SyncEngine</span> <span class="text-zinc-200">}</span> <span class="text-purple-400">from</span> <span class="text-emerald-300">'@codeshift/core'</span>;
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">02</span>
+                <span class="text-zinc-500">// Real-time collaborative room created by Kaushal</span>
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">03</span>
+                <span class="text-purple-400">const</span> <span class="text-yellow-200">session</span> <span class="text-purple-400">=</span> <span class="text-purple-400">new</span> <span class="text-cyan-300">CodeShift</span>.<span class="text-blue-300">Room</span>({
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">04</span>
+                <span class="w-4"></span><span class="text-zinc-300">id:</span> <span class="text-emerald-300">'think-together'</span>,
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">05</span>
+                <span class="w-4"></span><span class="text-zinc-300">mode:</span> <span class="text-emerald-300">'realtime-peer'</span>,
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1 relative items-center">
+                <span class="w-8 shrink-0">06</span>
+                <span class="w-4"></span><span class="text-zinc-300">collaborators:</span> [<span class="text-emerald-300">'Kaushal'</span>, <span class="text-emerald-300">'Peer_Dev'</span>]
+                <!-- Simulated Cursor 1 -->
+                <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-bold bg-violet-600 text-white shadow-md animate-bounce">
+                  Kaushal (Host)
+                </span>
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1">
+                <span class="w-8 shrink-0">07</span>
+                <span class="text-zinc-200">});</span>
+              </div>
+              <div class="flex text-zinc-600 select-none pb-1 items-center">
+                <span class="w-8 shrink-0">08</span>
+                <span class="text-yellow-200">session</span>.<span class="text-blue-300">shift</span>(<span class="text-emerald-300">'No limits. Just code.'</span>);
+                <!-- Simulated Cursor 2 -->
+                <span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[10px] font-sans font-bold bg-cyan-600 text-white shadow-md">
+                  Collaborator ✍️
+                </span>
+              </div>
+            </div>
+
+            <!-- Footer Bar of Preview -->
+            <div class="bg-surface-elevated/70 px-4 py-2 border-t border-border-dim flex items-center justify-between text-xs text-zinc-400">
+              <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                WebRTC & Broadcast Sync: Online
+              </span>
+              <span>UTF-8 • TypeScript • LF</span>
+            </div>
+          </div>
+
+          <!-- Feature Highlights Grid -->
+          <div class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-violet-500/30 transition-all group">
+              <div class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
+                ⚡
+              </div>
+              <h3 class="text-lg font-bold text-white mb-2">Instant Real-Time Sync</h3>
+              <p class="text-sm text-zinc-400 leading-relaxed">
+                Keystroke-by-keystroke synchronization across multiple tabs, windows, and remote peers with visible remote cursors.
+              </p>
+            </div>
+
+            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-violet-500/30 transition-all group">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
+                ▶
+              </div>
+              <h3 class="text-lg font-bold text-white mb-2">Live Execution & Preview</h3>
+              <p class="text-sm text-zinc-400 leading-relaxed">
+                Execute JavaScript code in a safe browser sandbox or render live HTML/CSS previews instantly without leaving the editor.
+              </p>
+            </div>
+
+            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-violet-500/30 transition-all group">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
+                📸
+              </div>
+              <h3 class="text-lg font-bold text-white mb-2">Shift Snapshots & Diffs</h3>
+              <p class="text-sm text-zinc-400 leading-relaxed">
+                Take time-stamped snapshots, compare diffs side-by-side, and restore past versions anytime during pair coding.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Brand Philosophy Callout -->
+          <div class="mt-16 p-8 rounded-3xl bg-gradient-to-r from-violet-950/30 via-surface-elevated/40 to-cyan-950/20 border border-violet-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <div class="flex items-center gap-2 text-violet-400 text-xs font-mono uppercase tracking-widest font-bold mb-1">
+                <span>The CodeShift Philosophy</span>
+              </div>
+              <h4 class="text-2xl font-bold text-white">Created for speed, flow, and shared ideas.</h4>
+              <p class="text-sm text-zinc-400 mt-1 max-w-xl">
+                Inspired by modern pairing workflows and the belief that developers do their best work when barriers disappear.
+              </p>
+            </div>
+            <button id="btn-hero-launch-room" class="btn-primary px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap shadow-lg shadow-violet-600/30">
+              Start Coding Now ↗
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ============================================== -->
+      <!-- VIEW 2: COLLABORATIVE STUDIO (ROOM)            -->
+      <!-- ============================================== -->
+      <section id="view-room" class="hidden flex-1 flex flex-col overflow-hidden">
+        
+        <!-- Studio Toolbar -->
+        <div class="bg-surface-elevated border-b border-border-dim px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+          
+          <!-- Left Controls: Language, Actions -->
+          <div class="flex items-center gap-2">
+            <!-- Language Dropdown -->
+            <div class="flex items-center gap-1.5 bg-surface border border-border-dim rounded-lg px-2 py-1">
+              <span class="text-zinc-500 font-mono text-[11px]">Lang:</span>
+              <select id="select-language" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="python">Python</option>
+                <option value="json">JSON</option>
+                <option value="markdown">Markdown</option>
+                <option value="rust">Rust</option>
+                <option value="go">Go</option>
+                <option value="sql">SQL</option>
+              </select>
+            </div>
+
+            <!-- Run Button -->
+            <button id="btn-run-code" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all shadow-sm">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+              </svg>
+              <span>Run (⌘Enter)</span>
+            </button>
+
+            <!-- Format Code Button -->
+            <button id="btn-format-code" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border-dim hover:border-border-highlight text-zinc-300 hover:text-white transition-all">
+              <span>✨ Format</span>
+            </button>
+
+            <!-- Take Snapshot -->
+            <button id="btn-take-snapshot" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border-dim hover:border-violet-500/40 text-violet-300 hover:text-white transition-all">
+              <span>📸 Snapshot</span>
+            </button>
+          </div>
+
+          <!-- Center: Room status & breadcrumb -->
+          <div class="hidden md:flex items-center gap-2 text-zinc-400 font-mono">
+            <span id="active-filename" class="text-zinc-200 font-semibold">main.js</span>
+            <span class="text-zinc-600">•</span>
+            <span id="code-stats">0 lines, 0 chars</span>
+          </div>
+
+          <!-- Right Controls: Share, Download, Panel toggles -->
+          <div class="flex items-center gap-2">
+            <!-- Download Code -->
+            <button id="btn-download-code" title="Download Code File" class="p-1.5 rounded-lg bg-surface border border-border-dim hover:text-white text-zinc-400 transition-all">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+            </button>
+
+            <!-- Share Room Link -->
+            <button id="btn-share-room" class="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+              </svg>
+              <span>Share Link</span>
+            </button>
+
+            <!-- Split Panel Toggle -->
+            <button id="btn-toggle-sidepanel" title="Toggle Output/Chat Panel" class="p-1.5 rounded-lg bg-surface border border-border-dim hover:text-white text-zinc-400 transition-all">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Studio Workspace (Split: Editor + Side Panel) -->
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+          <!-- Left / Primary: Code Editor Pane -->
+          <div id="editor-container" class="flex-1 flex flex-col min-w-0 bg-[#0d0e15] relative overflow-hidden">
+            
+            <!-- Quick Search Bar (Hidden by default, Cmd+F toggles) -->
+            <div id="editor-find-bar" class="hidden absolute top-2 right-4 z-20 bg-surface-elevated border border-border-dim rounded-lg p-1.5 shadow-xl flex items-center gap-2 text-xs">
+              <input id="input-find" type="text" placeholder="Find..." class="bg-surface px-2 py-1 rounded text-white font-mono focus:outline-none w-40"/>
+              <button id="btn-close-find" class="text-zinc-400 hover:text-white px-1">✕</button>
+            </div>
+
+            <!-- Remote Cursors Overlay Layer -->
+            <div id="remote-cursors-layer" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+            <!-- Editor Wrapper -->
+            <div class="flex-1 flex overflow-hidden font-mono text-sm">
+              <!-- Line Numbers Column -->
+              <div id="editor-line-numbers" class="w-12 py-3 select-none text-right pr-3 text-zinc-600 bg-[#090a0f] border-r border-border-dim/60 font-mono text-xs leading-6 overflow-hidden">
+                <div>1</div>
+              </div>
+
+              <!-- Editable Text Area / Input -->
+              <div class="flex-1 relative overflow-auto">
+                <textarea 
+                  id="code-editor-textarea" 
+                  class="absolute inset-0 w-full h-full p-3 font-mono text-sm leading-6 bg-transparent text-zinc-100 resize-none focus:outline-none selection:bg-violet-600/30 whitespace-pre tab-4" 
+                  spellcheck="false" 
+                  autocapitalize="off" 
+                  autocomplete="off"
+                  placeholder="// Start typing or collaborate live with your peer..."
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Editor Bottom Status Bar -->
+            <div class="bg-[#090a0f] border-t border-border-dim/70 px-4 py-1.5 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span id="sync-status">Synced</span>
+                </span>
+                <span class="text-zinc-600">|</span>
+                <span id="cursor-position">Ln 1, Col 1</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span>Tab: 2 spaces</span>
+                <span class="text-zinc-600">|</span>
+                <span id="editor-encoding">UTF-8</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resizer Handle (Divider) -->
+          <div id="pane-resizer" class="hidden md:block w-1 bg-border-dim hover:bg-violet-500 cursor-col-resize transition-colors"></div>
+
+          <!-- Right / Secondary: Output, Preview, Chat, Snapshots Panel -->
+          <div id="side-panel" class="w-full md:w-[440px] flex flex-col bg-surface border-t md:border-t-0 md:border-l border-border-dim transition-all">
+            
+            <!-- Side Panel Tabs -->
+            <div class="bg-surface-elevated border-b border-border-dim flex items-center text-xs font-medium">
+              <button class="side-tab active px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-violet-500 text-white" data-tab="tab-console">
+                <span>Console</span>
+                <span id="badge-console-count" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-700 text-zinc-300">0</span>
+              </button>
+              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-preview">
+                <span>Web Preview</span>
+              </button>
+              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-chat">
+                <span>Chat</span>
+                <span id="badge-chat-unread" class="hidden w-2 h-2 rounded-full bg-violet-400"></span>
+              </button>
+              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-snapshots">
+                <span>Snapshots</span>
+                <span id="badge-snapshots-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-700 text-zinc-300">0</span>
+              </button>
+            </div>
+
+            <!-- Tab Content 1: Console / Output -->
+            <div id="tab-console" class="tab-pane flex-1 flex flex-col overflow-hidden bg-[#0a0b10]">
+              <div class="p-2 border-b border-border-dim flex items-center justify-between text-xs">
+                <span class="text-zinc-400 font-mono">Execution Log</span>
+                <button id="btn-clear-console" class="text-zinc-500 hover:text-zinc-300 font-mono text-[11px]">Clear</button>
+              </div>
+              <div id="console-output" class="flex-1 p-3 font-mono text-xs overflow-y-auto space-y-2 select-text">
+                <div class="text-zinc-500 italic">// Console ready. Press Run (⌘+Enter) to execute your code.</div>
+              </div>
+            </div>
+
+            <!-- Tab Content 2: Live Web Preview -->
+            <div id="tab-preview" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-white">
+              <div class="bg-surface-elevated p-2 border-b border-border-dim flex items-center justify-between text-xs">
+                <span class="text-zinc-400 font-mono">Sandboxed HTML/CSS Preview</span>
+                <button id="btn-refresh-preview" class="text-violet-400 hover:text-violet-300 text-xs">↻ Refresh</button>
+              </div>
+              <iframe id="preview-iframe" class="w-full flex-1 border-0" sandbox="allow-scripts"></iframe>
+            </div>
+
+            <!-- Tab Content 3: Room Chat -->
+            <div id="tab-chat" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-surface">
+              <div id="chat-messages-container" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+                <div class="text-center text-zinc-500 text-[11px] my-2">Welcome to room chat! Messages are private to this room.</div>
+              </div>
+              <div class="p-2 border-t border-border-dim bg-surface-elevated flex items-center gap-2">
+                <input 
+                  type="text" 
+                  id="input-chat-message" 
+                  placeholder="Type a message to peers..." 
+                  class="flex-1 bg-surface border border-border-dim rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                />
+                <button id="btn-send-chat" class="btn-primary px-3 py-1.5 rounded-lg text-xs font-semibold">Send</button>
+              </div>
+            </div>
+
+            <!-- Tab Content 4: Snapshots & Diff History -->
+            <div id="tab-snapshots" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-surface">
+              <div class="p-3 border-b border-border-dim flex items-center justify-between text-xs">
+                <span class="text-zinc-300 font-semibold">Saved Checkpoints</span>
+                <button id="btn-create-snapshot-modal" class="text-violet-400 hover:text-violet-300 font-medium">+ New</button>
+              </div>
+              <div id="snapshots-list" class="flex-1 p-3 overflow-y-auto space-y-2">
+                <!-- Dynamically rendered snapshots -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Global Footer (on landing) -->
+    <footer id="app-footer" class="border-t border-border-dim bg-surface/50 backdrop-blur-sm py-6 text-xs text-zinc-500">
+      <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="font-extrabold text-zinc-300">CodeShift</span>
+          <span>•</span>
+          <span>Think together. Code without limits.</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span>Built for developers</span>
+          <span>•</span>
+          <span class="text-zinc-400">© 2026 CodeShift</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODALS                                         -->
+  <!-- ============================================== -->
+
+  <!-- Snapshot Diff Modal -->
+  <div id="modal-diff" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-border-dim flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white" id="diff-modal-title">Snapshot Diff Comparison</h3>
+          <p class="text-xs text-zinc-400" id="diff-modal-subtitle">Comparing snapshot against current editor buffer</p>
+        </div>
+        <button id="btn-close-diff-modal" class="text-zinc-400 hover:text-white p-1">✕</button>
+      </div>
+      <div id="diff-viewer" class="flex-1 p-4 font-mono text-xs overflow-auto bg-[#0a0b10] space-y-1">
+        <!-- Rendered Diff lines -->
+      </div>
+      <div class="p-3 border-t border-border-dim bg-surface flex items-center justify-end gap-3">
+        <button id="btn-close-diff" class="px-4 py-1.5 rounded-lg border border-border-dim text-xs text-zinc-300 hover:text-white">Close</button>
+        <button id="btn-restore-diff-snapshot" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Restore This Version</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nickname Change Modal -->
+  <div id="modal-nickname" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+      <h3 class="text-base font-bold text-white">Change Display Name</h3>
+      <p class="text-xs text-zinc-400">Your name will be visible to everyone in this CodeShift room.</p>
+      <input type="text" id="input-new-nickname" class="w-full bg-surface border border-border-dim rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" placeholder="e.g. Kaushal">
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btn-cancel-nickname" class="px-3 py-1.5 text-xs text-zinc-400 hover:text-white">Cancel</button>
+        <button id="btn-save-nickname" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Save Name</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="modal-settings" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-border-dim pb-3">
+        <h3 class="text-base font-bold text-white">Editor Preferences</h3>
+        <button id="btn-close-settings" class="text-zinc-400 hover:text-white">✕</button>
+      </div>
+      
+      <div class="space-y-4 text-xs">
+        <div class="flex items-center justify-between">
+          <label class="text-zinc-300 font-medium">Font Size</label>
+          <select id="setting-fontsize" class="bg-surface border border-border-dim rounded-lg px-2.5 py-1 text-white">
+            <option value="12">12px</option>
+            <option value="14" selected>14px (Default)</option>
+            <option value="16">16px</option>
+            <option value="18">18px</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="text-zinc-300 font-medium">Tab Size</label>
+          <select id="setting-tabsize" class="bg-surface border border-border-dim rounded-lg px-2.5 py-1 text-white">
+            <option value="2" selected>2 Spaces</option>
+            <option value="4">4 Spaces</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="text-zinc-300 font-medium">Auto-close Brackets</label>
+          <input type="checkbox" id="setting-autobrack" checked class="rounded border-zinc-700 text-violet-600 focus:ring-violet-500">
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="text-zinc-300 font-medium">Sound Effects</label>
+          <input type="checkbox" id="setting-sound" checked class="rounded border-zinc-700 text-violet-600 focus:ring-violet-500">
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button id="btn-save-settings" class="btn-primary px-4 py-2 rounded-lg text-xs font-semibold">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

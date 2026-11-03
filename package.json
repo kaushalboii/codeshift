@@ -1,0 +1,21 @@
+{
+  "name": "codeshift",
+  "version": "1.0.0",
+  "description": "CodeShift — Real-Time Collaborative Code Editor. Think together. Code without limits.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "codeshift",
+    "codeshare",
+    "collaborative-coding",
+    "real-time",
+    "code-editor",
+    "developer-tools"
+  ],
+  "author": "Kaushal",
+  "license": "MIT"
+}
+
