@@ -602,19 +602,9 @@
       .then(map => {
         if (!map) { setOnline(1); return; }
         const now = Date.now();
+        // Count users who pinged within last 15s — no deletions, data stays safe
         const active = Object.values(map).filter(v => v && (now - v.ts) < 15000).length;
         setOnline(Math.max(1, active));
-
-        // BACKEND STORAGE OPTIMIZATION:
-        // Automatically delete ghost presence records older than 45s to keep DB tiny
-        const deadThreshold = now - 45000;
-        Object.entries(map).forEach(([uid, val]) => {
-          if (val && val.ts && val.ts < deadThreshold) {
-            fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence/' + uid + '.json', {
-              method: 'DELETE'
-            }).catch(() => {});
-          }
-        });
       })
       .catch(() => setOnline(1));
   }
@@ -674,9 +664,10 @@
   }
 
   // ──────────────────────────────────────────────
-  // LIVING OP-ART RASTER & ASCII CANVAS ENGINE
-  // Full-screen generative scanline art, 3D volumetric moon,
-  // floating ASCII code particles, and responsive air-breather physics
+  // LIVING OP-ART RASTER & PARTICLE WAVE CANVAS
+  // Full-screen generative: 3D volumetric moon scanlines (top half)
+  // + teal dot-particle wave field (bottom half, like the 3rd image)
+  // Mouse-interactive air-breather physics throughout
   // ──────────────────────────────────────────────
   const mouseState = {
     x: window.innerWidth * 0.5,
@@ -711,33 +702,15 @@
     let W, H;
     let time = 0;
 
-    // Live ASCII moving code objects
-    const glyphs = ['0', '1', '<', '>', '{', '}', '*', '~', '+', '^', '/', '#', '$', '%', '&', '_', ';'];
-    let asciiParticles = [];
-
-    function initAsciiParticles() {
-      asciiParticles = Array.from({ length: 45 }, () => ({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        char: glyphs[Math.floor(Math.random() * glyphs.length)],
-        size: 9 + Math.random() * 6,
-        alpha: 0.15 + Math.random() * 0.45,
-        baseVx: (Math.random() - 0.5) * 0.35,
-        baseVy: -0.2 - Math.random() * 0.4,
-        phase: Math.random() * Math.PI * 2
-      }));
-    }
-
     function resize() {
       W = canvas.width  = window.innerWidth;
       H = canvas.height = window.innerHeight;
-      initAsciiParticles();
     }
 
     function render() {
       time += 0.016;
 
-      // Mouse smoothing & velocity
+      // Mouse smoothing
       mouseState.x += (mouseState.targetX - mouseState.x) * 0.08;
       mouseState.y += (mouseState.targetY - mouseState.y) * 0.08;
       const mdx = mouseState.x - mouseState.prevX;
@@ -746,221 +719,196 @@
       mouseState.prevX = mouseState.x;
       mouseState.prevY = mouseState.y;
 
-      // ──────────────────────────────────────────────
-      // 1. SKY & HORIZON GRADIENT (Luminous Petrol-Teal Atmosphere)
-      // ──────────────────────────────────────────────
-      const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0,    '#05131b');
-      sky.addColorStop(0.35, '#0a232d');
-      sky.addColorStop(0.65, '#163c49');
-      sky.addColorStop(0.85, '#102d38');
-      sky.addColorStop(1,    '#07161e');
-      ctx.fillStyle = sky;
+      // ── BACKGROUND (Deep dark petrol-black void as in Image 3) ──
+      const isMobile = W < 768;
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0,    '#010d10');
+      bg.addColorStop(0.42, '#021619');
+      bg.addColorStop(0.70, '#021c20');
+      bg.addColorStop(1,    '#010e11');
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // Moon center & radius (scales responsively)
-      const isMobile = W < 768;
-      const moonX = W * 0.5;
-      const moonY = H * (isMobile ? 0.26 : 0.30);
-      const moonR = Math.min(W, H) * (isMobile ? 0.16 : 0.135);
+      const horizonY = H * (isMobile ? 0.44 : 0.47);
 
-      // Luminous moonlight halo behind the line field
-      const haloR = moonR * 3.6;
-      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.5, moonX, moonY, haloR);
-      halo.addColorStop(0,   'rgba(142, 236, 248, 0.22)');
-      halo.addColorStop(0.3, 'rgba(78, 205, 220, 0.10)');
-      halo.addColorStop(0.7, 'rgba(30, 100, 115, 0.03)');
-      halo.addColorStop(1,   'rgba(0, 0, 0, 0)');
+      // ── MOON (TOP HALF) ──
+      const moonX = W * 0.5;
+      const moonY = H * (isMobile ? 0.22 : 0.25);
+      const moonR = Math.min(W, H) * (isMobile ? 0.13 : 0.12);
+
+      // Outer atmospheric halo
+      const haloR = moonR * 3.8;
+      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.3, moonX, moonY, haloR);
+      halo.addColorStop(0,    'rgba(140, 235, 225, 0.24)');
+      halo.addColorStop(0.35, 'rgba(60, 200, 195, 0.10)');
+      halo.addColorStop(0.75, 'rgba(20, 120, 115, 0.03)');
+      halo.addColorStop(1,    'rgba(0,0,0,0)');
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(moonX, moonY, haloR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Soft moon core glow
-      const moonCore = ctx.createRadialGradient(moonX, moonY, moonR * 0.2, moonX, moonY, moonR);
-      moonCore.addColorStop(0,   'rgba(180, 245, 255, 0.20)');
-      moonCore.addColorStop(0.8, 'rgba(100, 215, 235, 0.10)');
-      moonCore.addColorStop(1,   'rgba(40, 120, 140, 0.02)');
-      ctx.fillStyle = moonCore;
+      // Moon soft core radiance
+      const coreG = ctx.createRadialGradient(moonX, moonY, moonR * 0.1, moonX, moonY, moonR * 1.15);
+      coreG.addColorStop(0,   'rgba(220, 255, 252, 0.32)');
+      coreG.addColorStop(0.6, 'rgba(100, 220, 215, 0.12)');
+      coreG.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = coreG;
       ctx.beginPath();
-      ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+      ctx.arc(moonX, moonY, moonR * 1.15, 0, Math.PI * 2);
       ctx.fill();
 
-      // ──────────────────────────────────────────────
-      // 2. LIVE FLOATING ASCII OBJECTS & CODE PARTICLES
-      // ──────────────────────────────────────────────
-      ctx.font = '500 11px "JetBrains Mono", monospace';
-      asciiParticles.forEach(p => {
-        p.x += p.baseVx + Math.sin(time + p.phase) * 0.25;
-        p.y += p.baseVy;
-        if (p.y < -20) { p.y = H + 20; p.x = Math.random() * W; }
-        if (p.x < -20) p.x = W + 20;
-        if (p.x > W + 20) p.x = -20;
+      // ── OP-ART SCANLINES THROUGH SKY & MOON (UPPER HALF) ──
+      const lineSpacing = isMobile ? 4.2 : 3.4;
+      const xSampleStep = Math.max(3, Math.ceil(W / 220));
 
-        // Interactive mouse repulsion for ASCII characters
-        const dMouse = Math.hypot(p.x - mouseState.x, p.y - mouseState.y);
-        if (dMouse < 180) {
-          const rep = (1 - dMouse / 180) * 3;
-          p.x += ((p.x - mouseState.x) / dMouse) * rep;
-          p.y += ((p.y - mouseState.y) / dMouse) * rep;
-        }
+      for (let scanY = 3; scanY <= horizonY + 2; scanY += lineSpacing) {
+        const normY = scanY / horizonY;
+        const lineAlpha = 0.20 + 0.16 * Math.sin(normY * Math.PI);
 
-        const tw = 0.5 + 0.5 * Math.sin(time * 2 + p.phase);
-        ctx.fillStyle = `rgba(124, 226, 238, ${p.alpha * tw * 0.75})`;
-        ctx.fillText(p.char, p.x, p.y);
-      });
-
-      // ──────────────────────────────────────────────
-      // 3. FULL-SCREEN OP-ART RASTER LINE FIELD
-      // Continuous fine parallel horizontal lines across the whole canvas.
-      // Lines deform in 3D around the moon sphere & undulate over the hills!
-      // ──────────────────────────────────────────────
-      const lineStep = isMobile ? 4.5 : 3.8;
-      const totalLines = Math.floor(H / lineStep);
-      const xStep = Math.max(3, Math.floor(W / (isMobile ? 100 : 160)));
-
-      // Breathing harmonic waves
-      const breathTime = time * 0.85;
-      const breathAmp = Math.sin(breathTime) * 5;
-
-      ctx.lineWidth = 1.15;
-
-      for (let i = 2; i < totalLines - 1; i++) {
-        const baseY = i * lineStep;
-        const normY = baseY / H;
-
-        // Base line color: darker teal in sky, bright in moon/hills
-        let lineR = 30, lineG = 85, lineB = 105, lineA = 0.30;
-        if (normY > 0.45) {
-          const groundNorm = (normY - 0.45) / 0.55;
-          lineR = Math.round(55 + 65 * (1 - groundNorm * 0.6));
-          lineG = Math.round(145 + 75 * (1 - groundNorm * 0.5));
-          lineB = Math.round(175 + 65 * (1 - groundNorm * 0.5));
-          lineA = Math.min(0.85, 0.35 + 0.5 * Math.pow(1 - groundNorm, 0.7));
-        }
-
-        ctx.strokeStyle = `rgba(${lineR}, ${lineG}, ${lineB}, ${lineA})`;
+        ctx.strokeStyle = `rgba(50, 150, 155, ${lineAlpha})`;
+        ctx.lineWidth = 1.0;
         ctx.beginPath();
+        let firstPt = true;
 
-        let isFirst = true;
+        for (let x = 0; x <= W + xSampleStep; x += xSampleStep) {
+          let y = scanY;
 
-        for (let x = 0; x <= W + xStep; x += xStep) {
-          let y = baseY;
-
-          // ── A. MOON 3D SPHERICAL DEFORMATION ──
-          const dxMoon = x - moonX;
-          const dyMoon = baseY - moonY;
-          const distMoon = Math.hypot(dxMoon, dyMoon);
-
-          if (distMoon < moonR) {
-            // Inside the moon sphere — calculate 3D volumetric z-depth
-            const zNorm = Math.sqrt(Math.max(0, 1 - (distMoon / moonR) * (distMoon / moonR)));
-            // Spherical lens bulging
-            const lensBulge = -(zNorm) * (dyMoon / moonR) * (moonR * 0.42);
-            // Interactive mouse parallax tilt on the moon sphere
-            const tiltX = ((mouseState.x - moonX) / W) * 18 * zNorm;
-            const tiltY = ((mouseState.y - moonY) / H) * 22 * zNorm;
-
+          // 3D Moon sphere distortion
+          const dxM = x - moonX;
+          const dyM = scanY - moonY;
+          const distM = Math.hypot(dxM, dyM);
+          if (distM < moonR) {
+            const zN = Math.sqrt(Math.max(0, 1 - (distM / moonR) * (distM / moonR)));
+            const tiltY = ((mouseState.y - moonY) / (H * 0.5)) * 18 * zN;
+            const lensBulge = -(zN * zN) * (dyM / moonR) * moonR * 0.44;
             y += lensBulge + tiltY;
           }
 
-          // ── B. TOPOGRAPHIC HILLS (Lower 55% of canvas) ──
-          if (normY > 0.40) {
-            const normX = x / W;
-            const hillDepth = Math.pow((normY - 0.40) / 0.60, 1.4);
-
-            const h1 = Math.exp(-Math.pow((normX - 0.22) / 0.17, 2)) * H * 0.15;
-            const h2 = Math.exp(-Math.pow((normX - 0.76) / 0.23, 2)) * H * 0.21;
-            const h3 = Math.exp(-Math.pow((normX - 0.94) / 0.15, 2)) * H * 0.13;
-            const h4 = Math.exp(-Math.pow((normX - 0.46) / 0.16, 2)) * H * 0.07;
-
-            const elevation = (h1 + h2 + h3 + h4) * (1 - hillDepth);
-            const ambientRipple = (Math.sin(normX * 10 + breathTime) * 4 + breathAmp) * (1 - hillDepth * 0.7);
-
-            y -= (elevation + ambientRipple);
+          // Subtle breeze from mouse
+          const dMouse = Math.hypot(x - mouseState.x, scanY - mouseState.y);
+          if (dMouse < 200) {
+            const fo = Math.cos((dMouse / 200) * (Math.PI / 2));
+            y += Math.sin(dMouse * 0.05 - time * 3.5) * 10 * fo;
           }
 
-          // ── C. MOUSE "AIR BREATHER" FLUID BREEZE ──
-          const distToMouse = Math.hypot(x - mouseState.x, y - mouseState.y);
-          const breezeRadius = 260;
-
-          if (distToMouse < breezeRadius) {
-            const falloff = Math.cos((distToMouse / breezeRadius) * (Math.PI / 2));
-            // Expanding air wave
-            const ripple = Math.sin(distToMouse * 0.045 - time * 3.8) * 16 * falloff;
-            // Downward breeze push with mouse speed dynamics
-            const breezePress = falloff * 18 * Math.min(2.0, 0.4 + mouseState.speed * 0.08);
-            y += ripple + breezePress;
-          }
-
-          if (isFirst) {
-            ctx.moveTo(x, y);
-            isFirst = false;
-          } else {
-            ctx.lineTo(x, y);
-          }
+          if (firstPt) { ctx.moveTo(x, y); firstPt = false; }
+          else ctx.lineTo(x, y);
         }
         ctx.stroke();
 
-        // Extra highlight on the Moon lines for radiant luminous moon scanlines
-        const dyCenter = Math.abs(baseY - moonY);
+        // Luminous moon-surface highlight on lines passing through moon
+        const dyCenter = Math.abs(scanY - moonY);
         if (dyCenter < moonR) {
-          const halfSpan = Math.sqrt(moonR * moonR - dyCenter * dyCenter);
-          const spanLeft = Math.max(0, moonX - halfSpan);
-          const spanRight = Math.min(W, moonX + halfSpan);
-
+          const halfW = Math.sqrt(moonR * moonR - dyCenter * dyCenter);
+          const x0 = Math.max(0, moonX - halfW);
+          const x1 = Math.min(W, moonX + halfW);
           ctx.save();
-          ctx.strokeStyle = 'rgba(215, 248, 255, 0.88)';
-          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = 'rgba(215, 255, 255, 0.94)';
+          ctx.lineWidth = 1.35;
           ctx.beginPath();
-          let firstMoonPt = true;
-          for (let mx = spanLeft; mx <= spanRight; mx += xStep) {
+          let moonFirst = true;
+          for (let mx = x0; mx <= x1; mx += xSampleStep) {
             const dxM = mx - moonX;
-            const dyM = baseY - moonY;
+            const dyM = scanY - moonY;
             const distM = Math.hypot(dxM, dyM);
             const zN = Math.sqrt(Math.max(0, 1 - (distM / moonR) * (distM / moonR)));
-            const bulge = -(zN) * (dyM / moonR) * (moonR * 0.42);
-            const tiltY = ((mouseState.y - moonY) / H) * 22 * zN;
-            const my = baseY + bulge + tiltY;
-
-            if (firstMoonPt) { ctx.moveTo(mx, my); firstMoonPt = false; }
-            else { ctx.lineTo(mx, my); }
+            const tiltY = ((mouseState.y - moonY) / (H * 0.5)) * 18 * zN;
+            const bulge = -(zN * zN) * (dyM / moonR) * moonR * 0.44;
+            const my = scanY + bulge + tiltY;
+            if (moonFirst) { ctx.moveTo(mx, my); moonFirst = false; }
+            else ctx.lineTo(mx, my);
           }
           ctx.stroke();
           ctx.restore();
         }
       }
 
-      // ──────────────────────────────────────────────
-      // 4. SILHOUETTE TREE GROVES (Emerging between line ridges)
-      // ──────────────────────────────────────────────
-      ctx.fillStyle = '#06141c';
-      const treeClusters = [
-        [0.17, 0.50], [0.20, 0.47], [0.23, 0.49], [0.26, 0.52],
-        [0.72, 0.47], [0.75, 0.44], [0.78, 0.46], [0.82, 0.49]
-      ];
-      treeClusters.forEach(([rx, ry]) => {
-        const tx = rx * W;
-        const ty = ry * H;
-        ctx.beginPath();
-        ctx.moveTo(tx, ty - 18);
-        ctx.lineTo(tx - 7, ty + 4);
-        ctx.lineTo(tx - 11, ty + 18);
-        ctx.lineTo(tx + 11, ty + 18);
-        ctx.lineTo(tx + 7, ty + 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillRect(tx - 2, ty + 16, 4, 10);
-      });
+      // ── 3D PERSPECTIVE GLOWING TEAL DOT-PARTICLE WAVE PLATFORM (IMAGE 3) ──
+      const COLS = isMobile ? 46 : 64;
+      const ROWS = isMobile ? 32 : 44;
+      const fov = 310;
+      const groundH = H - horizonY;
 
-      // Drifting mist atmospheric band
-      const mistX = (time * 15) % W;
-      const mistG = ctx.createLinearGradient(0, H * 0.42, 0, H * 0.56);
-      mistG.addColorStop(0, 'rgba(124, 226, 238, 0)');
-      mistG.addColorStop(0.5, 'rgba(78, 205, 220, 0.05)');
-      mistG.addColorStop(1, 'rgba(124, 226, 238, 0)');
-      ctx.fillStyle = mistG;
-      ctx.fillRect(0, H * 0.42, W, H * 0.14);
+      // Compute and draw 3D perspective terrain mesh rows
+      for (let r = 0; r < ROWS; r++) {
+        const normR = r / (ROWS - 1); // 0 (far horizon) to 1 (near foreground)
+        const depthFade = Math.pow(normR, 0.62);
+        const worldZ = (1 - normR) * 640 + 65;
+        const scale = fov / (worldZ + fov);
+
+        const rowPoints = [];
+
+        for (let c = 0; c < COLS; c++) {
+          const normC = (c / (COLS - 1)) - 0.5; // -0.5 to +0.5
+          const worldX = normC * (W * 1.58);
+
+          // Flowing 3D sine wave harmonics
+          const w1 = Math.sin(normC * 6.8 + time * 1.15) * 52;
+          const w2 = Math.cos(normR * 8.2 - time * 0.88) * 44;
+          const w3 = Math.sin((normC * 4.4 + normR * 5.8) + time * 0.68) * 32;
+          const w4 = Math.cos(normC * 11.2 - time * 1.35) * 16;
+          let elevation = w1 + w2 + w3 + w4;
+
+          // Projected screen positions
+          const baseProjX = W * 0.5 + worldX * scale;
+          const baseProjY = horizonY + groundH * Math.pow(normR, 0.86) + elevation * scale;
+
+          // Live mouse reaction — dynamic fluid ripple & repulsion
+          const dMouse = Math.hypot(baseProjX - mouseState.x, baseProjY - mouseState.y);
+          if (dMouse < 220) {
+            const force = Math.cos((dMouse / 220) * (Math.PI / 2));
+            const ripple = Math.sin(dMouse * 0.045 - time * 4.5) * 40 * force;
+            const breeze = force * 24 * Math.min(2.5, 0.4 + mouseState.speed * 0.12);
+            elevation += ripple - breeze;
+          }
+
+          const screenX = W * 0.5 + worldX * scale;
+          const screenY = horizonY + groundH * Math.pow(normR, 0.86) + elevation * scale;
+
+          // Elevation normalized for wave ridge detection
+          const normElev = (elevation + 95) / 190;
+          const crest = Math.max(0, Math.min(1, normElev));
+
+          rowPoints.push({ screenX, screenY, crest, normR, depthFade });
+        }
+
+        // Draw fine flowing ribbon contour line connecting points in this row
+        ctx.strokeStyle = `rgba(0, 220, 210, ${0.06 + depthFade * 0.18})`;
+        ctx.lineWidth = 0.85;
+        ctx.beginPath();
+        for (let i = 0; i < rowPoints.length; i++) {
+          const pt = rowPoints[i];
+          if (i === 0) ctx.moveTo(pt.screenX, pt.screenY);
+          else ctx.lineTo(pt.screenX, pt.screenY);
+        }
+        ctx.stroke();
+
+        // Draw glowing dots on top of the ribbon (Image 3 luminous dots)
+        for (let i = 0; i < rowPoints.length; i++) {
+          const pt = rowPoints[i];
+          const dotRadius = Math.max(0.65, (0.95 + pt.crest * 1.85) * (0.42 + pt.depthFade * 0.88));
+          const alpha = Math.min(1, (0.16 + pt.crest * 0.80) * (0.32 + pt.depthFade * 0.68));
+
+          if (pt.crest > 0.64) {
+            // Electric glowing cyan ridge (Image 3 signature crest highlight)
+            ctx.fillStyle = `rgba(20, 255, 242, ${alpha})`;
+            ctx.shadowColor = 'rgba(0, 240, 225, 0.80)';
+            ctx.shadowBlur = Math.round(6 * pt.depthFade);
+          } else {
+            // Deep teal trough
+            const gVal = Math.round(130 + pt.crest * 105);
+            const bVal = Math.round(150 + pt.crest * 95);
+            ctx.fillStyle = `rgba(10, ${gVal}, ${bVal}, ${alpha * 0.85})`;
+            ctx.shadowBlur = 0;
+          }
+
+          ctx.beginPath();
+          ctx.arc(pt.screenX, pt.screenY, dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.shadowBlur = 0;
 
       state.canvasAnimId = requestAnimationFrame(render);
     }
