@@ -21,7 +21,7 @@
     userId: localStorage.getItem('codeshare_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
     userName: localStorage.getItem('codeshare_user_name') || 'Kaushal',
     userColor: localStorage.getItem('codeshare_user_color') || getRandomColor(),
-    firebaseUrl: localStorage.getItem('codeshare_firebase_url') || '',
+    firebaseUrl: localStorage.getItem('codeshare_firebase_url') || 'https://codeshift-realtimedb-default-rtdb.firebaseio.com',
     serverUrl: localStorage.getItem('codeshift_ws_server') || (window.CODESHIFT_WS_SERVER || ''),
     language: localStorage.getItem('codeshare_default_lang') || 'javascript',
     isHost: false,
@@ -590,7 +590,7 @@ Type or paste anything here. It auto-saves instantly.`
 
   // --- 1. Firebase Realtime Database Engine ---
   function initFirebaseSync(roomId) {
-    const dbUrl = (state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || '').trim();
+    const dbUrl = (state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || 'https://codeshift-realtimedb-default-rtdb.firebaseio.com').trim();
     if (!dbUrl || typeof firebase === 'undefined') {
       if (el.cloudSyncBadge) el.cloudSyncBadge.textContent = 'Cloud Sync (Setup)';
       return;
