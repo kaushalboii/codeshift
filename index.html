@@ -3,560 +3,336 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Codeshare — Share Code in Real-time with Developers</title>
-  <meta name="description" content="An online code editor for interviews, troubleshooting, teaching & more. Share code in real-time with developers.">
+  <title>CodeShare — Instant Real-Time Code Sharing</title>
+  <meta name="description" content="Simple, instant real-time code sharing with auto-save and seamless multi-device sync without login.">
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
 
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Monaco Editor Loader (VS Code Engine) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+  <!-- Firebase Realtime Database (Client SDK for serverless multi-device cloud sync) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <!-- PeerJS for direct WebRTC cross-device sync -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
+  <!-- Ambient Mesh Background -->
+  <div class="mesh-background-glow"></div>
+  <div class="mesh-grid-pattern"></div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <!-- App Container -->
+  <!-- App Shell -->
   <div id="app">
 
-    <!-- ==================================================================== -->
-    <!-- VIEW 1: CODESHARE LANDING PAGE                                       -->
-    <!-- ==================================================================== -->
-    <div id="view-landing">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
       
-      <!-- Top Navigation -->
-      <nav class="landing-nav">
-        <a href="#/" class="brand-logo-wrap" id="brand-logo">
-          <span class="brand-icon">&gt;&lt;</span>
-          <span>codeshare</span>
+      <div class="header-left">
+        <!-- Logo -->
+        <a href="#/" class="brand-logo" id="brand-logo" title="CodeShare Home">
+          <span class="brand-logo-icon">&gt;&lt;</span>
+          <span>CodeShare</span>
         </a>
-        <div class="landing-nav-links">
-          <a href="#/pricing" id="nav-link-pricing">Pricing</a>
-          <a href="#/signup" id="nav-link-signup">Sign Up</a>
-          <button id="nav-btn-instant-room" class="landing-login-btn">Log In</button>
-        </div>
-      </nav>
 
-      <!-- Hero Section -->
-      <section class="landing-hero">
-        <h1 class="landing-hero-title">Share Code in Real-time with Developers</h1>
-        <p class="landing-hero-sub">An online code editor for interviews, troubleshooting, teaching &amp; more…</p>
+        <!-- Room Link Badge -->
+        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link">
+          <span>🔗</span>
+          <span id="room-nav-id">/demo</span>
+        </div>
+
+        <!-- Auto-Save Status Pill -->
+        <div class="save-status-pill" id="save-status-container" title="Every keystroke is auto-saved in real-time">
+          <span class="status-dot saved" id="save-status-dot"></span>
+          <span id="save-status-text">Saved</span>
+        </div>
+      </div>
+
+      <!-- Center Controls: Language & Active Users -->
+      <div class="header-center">
         
-        <button id="btn-hero-launch-room" class="btn-coral-cta">
-          <span>Share Code Now</span>
+        <!-- Language Syntax Selector -->
+        <select id="select-language" class="language-dropdown-select" title="Change syntax mode">
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="html">HTML / CSS</option>
+          <option value="css">CSS</option>
+          <option value="json">JSON</option>
+          <option value="sql">SQL</option>
+          <option value="rust">Rust</option>
+          <option value="go">Go</option>
+          <option value="markdown">Markdown</option>
+          <option value="plaintext">Plain Text</option>
+        </select>
+
+        <!-- Active Users Online Counter -->
+        <div class="online-users-badge" id="btn-change-nickname" title="Click to change your display name" style="cursor: pointer;">
+          <span id="user-role-badge">👤</span>
+          <span id="online-users-count">1 online</span>
+          <span id="user-nickname-display" style="opacity: 0.7; margin-left: 3px;">(You)</span>
+        </div>
+
+      </div>
+
+      <!-- Right Action Controls -->
+      <div class="header-right">
+        
+        <!-- Copy Share Link Button (Primary) -->
+        <button id="btn-share-room" class="btn-coral-share" title="Share this room with anyone across devices">
+          <span>🔗</span>
+          <span>Share Link</span>
         </button>
-        <span class="landing-hero-note">Share code for free.</span>
 
-        <!-- Hidden input for custom room creation if requested -->
-        <input type="hidden" id="input-custom-room" value="">
-        <button id="btn-create-or-join" class="hidden"></button>
-        <button id="btn-quick-sample-room" class="hidden"></button>
+        <!-- New Clean Room -->
+        <button id="btn-hero-launch-room" class="btn-subtle-action" title="Create a new clean code room">
+          <span>➕</span>
+          <span>New</span>
+        </button>
 
-        <!-- Double Mockups: Editor + Video Collaboration -->
-        <div class="hero-mockups-wrap">
-          
-          <!-- Mockup 1: Real-time Editor Window -->
-          <div class="editor-window-mockup">
-            <div class="window-titlebar">
-              <span class="window-dot dot-red"></span>
-              <span class="window-dot dot-yellow"></span>
-              <span class="window-dot dot-green"></span>
-            </div>
-            <div class="mockup-body">
-              <div class="mockup-line"><span class="line-no">1</span><span>// https://codeshare.io/session/fibonacci</span></div>
-              <div class="mockup-line"><span class="line-no">2</span><span>// 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144...</span></div>
-              <div class="mockup-line"><span class="line-no">3</span><span></span></div>
-              <div class="mockup-line"><span class="line-no">4</span><span><span class="mockup-code-highlight">function</span> fibonacci(n) {</span></div>
-              <div class="mockup-line"><span class="line-no">5</span><span>&nbsp;&nbsp;if (n &lt;= 1) return n;</span></div>
-              <div class="mockup-line"><span class="line-no">6</span><span>&nbsp;&nbsp;<span class="mockup-code-highlight">return</span> fibonacci(n - 1) + fibonacci(n - 2);</span></div>
-              <div class="mockup-line"><span class="line-no">7</span><span>}</span></div>
-              <div class="mockup-line"><span class="line-no">8</span><span></span></div>
-              <div class="mockup-line"><span class="line-no">9</span><span>console.log(fibonacci(10)); <span class="mockup-cursor"></span></span></div>
-            </div>
-          </div>
+        <!-- Cloud Sync / Firebase Settings -->
+        <button id="btn-open-cloud-sync" class="btn-subtle-action" title="Configure Firebase Realtime Database or Cloud Sync">
+          <span>☁️</span>
+          <span id="cloud-sync-badge">Cloud Sync</span>
+        </button>
 
-          <!-- Mockup 2: Peer Collaboration Tile -->
-          <div class="video-window-mockup">
-            <div class="window-titlebar">
-              <span class="window-dot dot-red"></span>
-              <span class="window-dot dot-yellow"></span>
-              <span class="window-dot dot-green"></span>
-            </div>
-            <div class="video-tile">
-              <div class="avatar-pair-badge">👨‍💻</div>
-              <div class="video-label">Kaushal &amp; Collaborator</div>
-              <div class="video-status">● Live WebSocket Peer Sync</div>
-            </div>
-          </div>
+        <!-- Preferences / Settings -->
+        <button id="btn-open-settings" class="btn-icon-rail" title="Editor Preferences">
+          <span>⚙️</span>
+        </button>
 
-        </div>
-      </section>
+        <!-- Download Code -->
+        <button id="btn-download-code" class="btn-icon-rail" title="Download Code File">
+          <span>⬇️</span>
+        </button>
 
-      <!-- Blue Feature Section (Exact Codeshare Blue) -->
-      <section class="landing-blue-section">
-        <div class="blue-section-container">
-          
-          <!-- Logos Banner -->
-          <div class="logos-strip">
-            <span class="logos-heading">Used by software engineers at companies and universities we respect and admire.</span>
-            <div class="logos-row">
-              <span>Adobe</span>
-              <span>Microsoft</span>
-              <span>Stanford University</span>
-              <span>IBM</span>
-              <span>ebay</span>
-              <span>Cornell</span>
-            </div>
-          </div>
+        <!-- Fullscreen Toggle -->
+        <button id="btn-toggle-fullscreen" class="btn-icon-rail" title="Toggle Fullscreen">
+          <span>⛶</span>
+        </button>
 
-          <!-- 3 Columns -->
-          <div class="feature-columns-grid">
-            
-            <div class="feature-col">
-              <h3>Code with your team</h3>
-              <p>Open a Codeshare editor, write or copy code, then share it with friends and colleagues. Pair program and troubleshoot together.</p>
-              <button class="btn-white-outline btn-launch-trigger">Hack Together</button>
-            </div>
+      </div>
 
-            <div class="feature-col">
-              <h3>Interview developers</h3>
-              <p>Set coding tasks and observe in real-time when interviewing remotely or in person. Nobody likes writing code on a whiteboard.</p>
-              <button class="btn-white-outline btn-launch-trigger">Start An Interview</button>
-            </div>
+    </header>
 
-            <div class="feature-col">
-              <h3>Teach people to program</h3>
-              <p>Share your code with students and peers then educate them. Universities and colleges around the world use Codeshare every day.</p>
-              <button class="btn-white-outline btn-launch-trigger">Teach Code</button>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      <!-- Landing Dark Footer -->
-      <footer id="app-footer" class="landing-footer">
-        <div class="footer-credit">Created by <a href="https://github.com/kaushalboii" target="_blank">Kaushal</a>. For help and support shoot us an <a href="mailto:kaushal@codeshift.dev">email</a>.</div>
-        <div><a href="#/privacy">Privacy Policy</a> • <a href="#/terms">Terms of Service</a></div>
-      </footer>
-
-    </div>
-
-
-    <!-- ==================================================================== -->
-    <!-- VIEW 2: CODESHARE COLLABORATIVE EDITOR (ROOM)                        -->
-    <!-- ==================================================================== -->
-    <div id="view-room" class="hidden">
+    <!-- Code Editor Canvas (Full Height Type Space) -->
+    <main class="editor-viewport-wrapper">
+      <div id="monaco-editor-container"></div>
       
-      <!-- Top Room Navigation Bar (Codeshare Style) -->
-      <header class="room-header">
-        
-        <div class="room-header-left">
-          <a href="#/" class="brand-logo-wrap" title="Back to home">
-            <span class="brand-icon">&gt;&lt;</span>
-            <span>codeshare</span>
-          </a>
-          <span id="room-nav-id" class="room-slug-badge">kaushal</span>
-          
-          <!-- Room Nav Controls Compatibility Container -->
-          <div id="room-nav-controls" class="flex" style="align-items: center; gap: 8px;">
-            <span id="global-connection-pill" class="user-badge-chip" title="Click to view connection status" style="cursor: pointer;">
-              <span id="sync-indicator-dot" class="user-status-dot"></span>
-              <span id="global-connection-label">Live</span>
-            </span>
-          </div>
-        </div>
-
-        <div class="room-header-right">
-          <span class="expiry-tag">Expires in 24 hours</span>
-          
-          <!-- Action Buttons -->
-          <button id="btn-take-snapshot" class="btn-header-save" title="Save snapshot checkpoint (⌘+S)">
-            <span>🔖</span>
-            <span>Save</span>
-          </button>
-          
-          <button id="btn-share-room" class="btn-header-share" title="Share this room link">
-            <span>👥</span>
-            <span>Share</span>
-          </button>
-
-          <button id="btn-run-code" class="btn-header-run" title="Execute current code (⌘+Enter)">
-            <span>▶</span>
-            <span>Run</span>
-          </button>
-
-          <!-- User Chip -->
-          <button id="btn-change-nickname" class="user-badge-chip" title="Click to change your display name">
-            <span id="user-role-badge">👤</span>
-            <span id="user-nickname-display">You</span>
-          </button>
-
-          <!-- Hidden compatibility elements -->
-          <button id="btn-copy-room-link" class="hidden"></button>
-          <button id="btn-format-code" class="hidden"></button>
-          <button id="btn-create-snapshot-modal" class="hidden"></button>
-          <div id="peer-avatars" class="hidden"></div>
-        </div>
-
-      </header>
-
-      <!-- GitHub Pages Notice Banner (Shown on static hosts without server) -->
-      <div id="connection-notice-banner" class="room-alert-banner banner-info hidden">
-        <div>
-          <span>📡 </span>
-          <span id="connection-notice-text">Static GitHub Pages Mode: Syncing across local tabs. To pair across different computers, connect a WebSocket backend.</span>
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button id="btn-banner-config-server" style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Configure Server</button>
-          <button id="btn-banner-dismiss" style="opacity: 0.6;">✕</button>
-        </div>
+      <!-- Lightweight Fallback Editor -->
+      <div id="fallback-editor-wrapper" class="hidden">
+        <div id="editor-line-numbers">1</div>
+        <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Type or paste your code here... Auto-saves instantaneously."></textarea>
       </div>
+    </main>
 
-      <!-- View-Only Lock Banner -->
-      <div id="readonly-banner" class="room-alert-banner banner-warning hidden">
-        <div>
-          <span>🔒 </span>
-          <span>View-Only Mode: Editing is locked by the host. You can inspect and run tests, but edits are disabled.</span>
-        </div>
-        <span style="font-family: var(--cs-font-mono); font-size: 10px; font-weight: 700;">READ-ONLY</span>
+    <!-- Bottom Status Strip -->
+    <footer class="editor-status-bar">
+      <div class="status-left">
+        <span id="cursor-position">Ln 1, Col 1</span>
+        <span>•</span>
+        <span id="code-stats">0 lines</span>
+        <span>•</span>
+        <span id="sync-status">Local &amp; Peer Sync Active</span>
       </div>
-
-      <!-- Main Room Workspace -->
-      <div class="room-workspace">
-        
-        <!-- Editor Canvas (Edge-to-Edge) -->
-        <main class="editor-main-canvas" id="editor-container">
-          <div id="monaco-editor-container"></div>
-          
-          <!-- Lightweight Fallback Editor -->
-          <div id="fallback-editor-wrapper" class="hidden">
-            <div id="editor-line-numbers">1</div>
-            <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Write or paste your code here..."></textarea>
-          </div>
-        </main>
-
-        <!-- Right Vertical Action Rail (Exact Codeshare Signature Toolbar) -->
-        <aside class="room-right-rail">
-          
-          <!-- Settings Trigger -->
-          <button id="btn-open-settings" class="rail-btn" title="Editor Preferences &amp; Settings">
-            <span>⚙️</span>
-          </button>
-
-          <!-- Download Code -->
-          <button id="btn-download-code" class="rail-btn" title="Download Code File">
-            <span>⬇️</span>
-          </button>
-
-          <!-- Toggle Chat -->
-          <button id="btn-toggle-chat" class="rail-btn" title="Room Chat">
-            <span>💬</span>
-            <span id="badge-chat-unread" class="rail-badge hidden"></span>
-          </button>
-
-          <!-- Toggle Console / Preview -->
-          <button id="btn-toggle-console" class="rail-btn" title="Execution Console &amp; Web Preview">
-            <span>📺</span>
-          </button>
-
-          <!-- Lock Room View-Only (Host) -->
-          <button id="btn-toggle-readonly" class="rail-btn" title="Toggle View-Only Lock">
-            <span id="icon-readonly">🔓</span>
-            <span id="label-readonly" class="hidden">Lock</span>
-          </button>
-
-          <!-- Password Lock -->
-          <button id="btn-set-room-password" class="rail-btn" title="Room Security &amp; Password">
-            <span>🔑</span>
-          </button>
-
-          <!-- Fullscreen -->
-          <button id="btn-toggle-fullscreen" class="rail-btn" title="Toggle Fullscreen">
-            <span>⛶</span>
-          </button>
-
-          <!-- Hidden compatibility elements -->
-          <button id="btn-toggle-sidepanel" class="hidden"></button>
-          <div id="side-panel" class="hidden"></div>
-          <div class="side-tab hidden" data-tab="tab-console"></div>
-          <div class="tab-pane hidden" id="tab-console"></div>
-          <span id="badge-snapshots-count" class="hidden">0</span>
-          <span id="badge-execution-mode" class="hidden"></span>
-          <span id="editor-engine-label" class="hidden">Monaco</span>
-          <div id="snapshots-list" class="hidden"></div>
-        </aside>
-
-        <!-- ================================================================ -->
-        <!-- SLIDEOUT DRAWER 1: SETTINGS DRAWER                               -->
-        <!-- ================================================================ -->
-        <div id="drawer-settings" class="slideout-drawer closed">
-          <div class="drawer-header">
-            <span class="drawer-title">Editor Settings</span>
-            <button id="btn-close-drawer-settings" class="drawer-close-btn">✕</button>
-          </div>
-          
-          <div class="drawer-content">
-            
-            <div class="settings-group">
-              <label class="settings-label" for="select-language">Syntax Mode</label>
-              <select id="select-language" class="settings-select">
-                <option value="javascript">JavaScript</option>
-                <option value="typescript">TypeScript</option>
-                <option value="html">HTML / CSS</option>
-                <option value="css">CSS</option>
-                <option value="python">Python</option>
-                <option value="json">JSON</option>
-                <option value="markdown">Markdown</option>
-                <option value="rust">Rust</option>
-                <option value="go">Go</option>
-                <option value="sql">SQL</option>
-              </select>
-            </div>
-
-            <div class="settings-group">
-              <label class="settings-label" for="select-theme">Editor Theme</label>
-              <select id="select-theme" class="settings-select">
-                <option value="codeshift">Codeshare Dark (Default)</option>
-                <option value="obsidian">Obsidian Black</option>
-                <option value="cyberpunk">Cyber Neon</option>
-                <option value="tokyo">Tokyo Night</option>
-                <option value="light">Paper Light</option>
-              </select>
-            </div>
-
-            <div class="settings-group">
-              <label class="settings-label" for="setting-fontsize">Font Size</label>
-              <select id="setting-fontsize" class="settings-select">
-                <option value="12">12px</option>
-                <option value="14" selected>14px (Default)</option>
-                <option value="16">16px</option>
-                <option value="18">18px</option>
-              </select>
-            </div>
-
-            <div class="settings-group">
-              <label class="settings-label" for="setting-tabsize">Tab Size</label>
-              <select id="setting-tabsize" class="settings-select">
-                <option value="2" selected>2 Spaces</option>
-                <option value="4">4 Spaces</option>
-              </select>
-            </div>
-
-            <div class="settings-checkbox-row">
-              <span>Word Wrap</span>
-              <input type="checkbox" id="setting-wordwrap" checked>
-            </div>
-
-            <div class="settings-checkbox-row">
-              <span>Sound Effects</span>
-              <input type="checkbox" id="setting-sound" checked>
-            </div>
-
-            <div class="settings-group" style="border-top: 1px solid var(--cs-border); padding-top: 14px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label class="settings-label" style="margin-bottom: 0;">Backend WebSocket Relay</label>
-                <button type="button" id="btn-test-server-ping" style="font-size: 10px; color: var(--cs-coral); background: rgba(235,77,75,0.1); padding: 2px 6px; border-radius: 3px;">Test Ping</button>
-              </div>
-              <input type="text" id="setting-server-url" placeholder="wss://your-backend.workers.dev" class="settings-input">
-              <p style="font-size: 11px; color: #7d8697; margin-top: 5px; line-height: 1.4;">
-                GitHub Pages is static. For internet-wide pairing across different computers, enter your Cloudflare Worker or Render WebSocket relay.
-              </p>
-            </div>
-
-            <div style="margin-top: 20px;">
-              <button id="btn-save-settings" class="btn-coral-cta" style="width: 100%; justify-content: center; padding: 9px;">Save Preferences</button>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- ================================================================ -->
-        <!-- SLIDEOUT DRAWER 2: CHAT & CONSOLE DRAWER                         -->
-        <!-- ================================================================ -->
-        <div id="drawer-chat" class="slideout-drawer closed">
-          <div class="drawer-header">
-            <span class="drawer-title" id="chat-drawer-title">Room Chat</span>
-            <button id="btn-close-drawer-chat" class="drawer-close-btn">✕</button>
-          </div>
-          
-          <div class="chat-container">
-            <div id="chat-messages-container" class="chat-messages-box">
-              <div class="chat-bubble">
-                <div class="chat-meta">
-                  <span class="chat-author" style="color: var(--cs-coral);">Codeshare</span>
-                  <span class="chat-time">Now</span>
-                </div>
-                <div>Welcome to real-time room chat! Messages are broadcast instantaneously to all peers.</div>
-              </div>
-            </div>
-
-            <div class="chat-input-bar">
-              <input type="text" id="input-chat-message" class="chat-input-field" placeholder="Type a message...">
-              <button id="btn-send-chat" class="chat-send-btn">Send</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ================================================================ -->
-        <!-- SLIDEOUT DRAWER 3: CONSOLE & WEB PREVIEW DRAWER                  -->
-        <!-- ================================================================ -->
-        <div id="drawer-console" class="slideout-drawer closed" style="width: 440px;">
-          <div class="drawer-header">
-            <div style="display: flex; gap: 12px;">
-              <button id="tab-btn-console" style="font-weight: 600; color: #ffffff; border-bottom: 2px solid var(--cs-coral); padding-bottom: 2px;">Console</button>
-              <button id="tab-btn-preview" style="color: #9aa2b1;">Web Preview</button>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <button id="btn-clear-console" style="font-size: 11px; color: #9aa2b1;" title="Clear console">Clear</button>
-              <button id="btn-refresh-preview" style="font-size: 11px; color: #9aa2b1; display: none;" title="Refresh preview">↻</button>
-              <button id="btn-close-drawer-console" class="drawer-close-btn">✕</button>
-            </div>
-          </div>
-          
-          <div class="drawer-content" style="padding: 12px; height: 100%;">
-            <div id="console-output" class="console-box">
-              <div style="color: #64748b;">// Console ready. Press Run (⌘+Enter) to execute your code.</div>
-            </div>
-            <iframe id="preview-iframe" class="hidden" sandbox="allow-scripts allow-modals" style="width: 100%; height: 360px; background: #ffffff; border-radius: 4px; border: none;"></iframe>
-          </div>
-        </div>
-
+      <div class="status-right">
+        <span id="editor-engine-label">Monaco Editor (VS Code)</span>
+        <span>•</span>
+        <span>Instant Auto-Save ⚡</span>
       </div>
-
-      <!-- Bottom Status Bar -->
-      <footer class="room-bottom-bar">
-        <div class="bottom-bar-left">
-          <span id="cursor-position">Ln 1, Col 1</span>
-          <span>•</span>
-          <span id="code-stats">0 lines</span>
-          <span>•</span>
-          <span id="sync-status">Live WebSocket</span>
-        </div>
-        <div class="bottom-bar-right">
-          <span>Codeshare Engine ⚡</span>
-          <span>•</span>
-          <a href="#/privacy" style="color: inherit;">Privacy</a>
-          <span>•</span>
-          <a href="#/terms" style="color: inherit;">Terms</a>
-        </div>
-      </footer>
-
-    </div>
-
-
-    <!-- ==================================================================== -->
-    <!-- MODAL DIALOGS                                                        -->
-    <!-- ==================================================================== -->
-
-    <!-- 1. Share Modal (Clean Codeshare Popup) -->
-    <div id="modal-share" class="modal-backdrop hidden">
-      <div class="modal-card">
-        <div class="modal-top">
-          <h3 class="modal-heading">Share Code with Developers</h3>
-          <button id="btn-close-share" class="drawer-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-subtext">Anyone with this link will be able to see and edit your code in real-time. Share it with friends or students.</p>
-          <div class="share-input-group">
-            <input type="text" id="input-share-link" class="share-url-input" readonly>
-            <button id="btn-modal-copy-link" class="btn-coral-copy">Copy Link</button>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="btn-modal-done-share" class="btn-modal-confirm">Done</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Settings Modal Compatibility Wrapper -->
-    <div id="modal-settings" class="hidden">
-      <button id="btn-close-settings" class="hidden"></button>
-    </div>
-
-    <!-- 3. Change Nickname Modal -->
-    <div id="modal-nickname" class="modal-backdrop hidden">
-      <div class="modal-card">
-        <div class="modal-top">
-          <h3 class="modal-heading">Change Display Name</h3>
-          <button id="btn-cancel-nickname" class="drawer-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-subtext">Your name will be visible to everyone in this Codeshare room.</p>
-          <input type="text" id="input-new-nickname" class="share-url-input" placeholder="Your name (e.g. Kaushal)" maxlength="24">
-        </div>
-        <div class="modal-footer">
-          <button id="btn-cancel-nickname-2" class="btn-modal-cancel">Cancel</button>
-          <button id="btn-save-nickname" class="btn-modal-confirm">Save Name</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. Room Password Protect Modal -->
-    <div id="modal-set-password" class="modal-backdrop hidden">
-      <div class="modal-card">
-        <div class="modal-top">
-          <h3 class="modal-heading">Room Password Protection</h3>
-          <button id="btn-cancel-set-password" class="drawer-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-subtext">Set a password to restrict room access, or leave blank to make it public.</p>
-          <input type="password" id="input-new-room-password" class="share-url-input" placeholder="Enter password (leave blank for open access)">
-        </div>
-        <div class="modal-footer">
-          <button id="btn-cancel-set-password-2" class="btn-modal-cancel">Cancel</button>
-          <button id="btn-save-room-password" class="btn-modal-confirm">Save Password</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. Password Prompt Modal (When entering locked room) -->
-    <div id="modal-password" class="modal-backdrop hidden">
-      <div class="modal-card">
-        <div class="modal-top">
-          <h3 class="modal-heading">🔒 Password Protected Room</h3>
-          <button id="btn-cancel-password" class="drawer-close-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-subtext">This Codeshare session requires a password to enter.</p>
-          <input type="password" id="input-room-password" class="share-url-input" placeholder="Enter room password">
-          <p id="password-error" class="hidden" style="color: var(--cs-coral); font-size: 12px; margin-top: 6px;">Incorrect password. Please try again.</p>
-        </div>
-        <div class="modal-footer">
-          <button id="btn-cancel-password-2" class="btn-modal-cancel">Back to Home</button>
-          <button id="btn-submit-password" class="btn-modal-confirm">Unlock Room</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. Diff & Snapshot Comparison Modal -->
-    <div id="modal-diff" class="modal-backdrop hidden">
-      <div class="modal-card" style="max-width: 700px;">
-        <div class="modal-top">
-          <div>
-            <h3 id="diff-modal-title" class="modal-heading">Snapshot Diff Comparison</h3>
-            <span id="diff-modal-subtitle" style="font-size: 11px; color: #9aa2b1;">Comparing against current buffer</span>
-          </div>
-          <button id="btn-close-diff-modal" class="drawer-close-btn">✕</button>
-        </div>
-        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
-          <div id="diff-viewer" style="font-family: var(--cs-font-mono); font-size: 12px; line-height: 1.6;"></div>
-        </div>
-        <div class="modal-footer">
-          <button id="btn-close-diff" class="btn-modal-cancel">Close</button>
-          <button id="btn-restore-diff-snapshot" class="btn-modal-confirm">Restore This Version</button>
-        </div>
-      </div>
-    </div>
+    </footer>
 
   </div>
+
+
+  <!-- ==================================================================== -->
+  <!-- MODAL DIALOGS                                                        -->
+  <!-- ==================================================================== -->
+
+  <!-- 1. Share Link Modal -->
+  <div id="modal-share" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Share Code in Real-Time</h3>
+        <button id="btn-close-share" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-content">
+        <p class="modal-description">Anyone with this link will immediately see your code and synchronize changes in real-time across devices.</p>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="input-share-link" class="form-input" style="font-family: var(--cs-font-mono);" readonly>
+          <button id="btn-modal-copy-link" class="btn-primary" style="white-space: nowrap;">Copy Link</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-done-share" class="btn-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Cloud Sync & Firebase Database Modal -->
+  <div id="modal-cloud-sync" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">☁️ Cloud Database &amp; Multi-Device Sync</h3>
+        <button id="btn-close-cloud-sync" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-content">
+        <p class="modal-description">
+          To connect two different computers across the internet with 100% cloud persistence without a server, connect to <strong>Firebase Realtime Database</strong> (free spark plan):
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="input-firebase-url">Firebase Database URL</label>
+          <input type="text" id="input-firebase-url" class="form-input" placeholder="https://your-project-default-rtdb.firebaseio.com">
+          <p style="font-size: 11px; color: var(--cs-text-dim); margin-top: 4px;">
+            Create a free database at <a href="https://console.firebase.google.com" target="_blank" style="color: var(--cs-coral); text-decoration: underline;">console.firebase.google.com</a> (start in test mode) and paste the URL here.
+          </p>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px; border-top: 1px solid var(--cs-border); padding-top: 12px;">
+          <label class="form-label" for="setting-server-url">Or Custom Node.js / WebSocket Relay</label>
+          <input type="text" id="setting-server-url" class="form-input" placeholder="wss://your-render-app.onrender.com or ws://localhost:3000">
+        </div>
+
+        <div id="sync-diagnostics" style="padding: 10px; background: rgba(0,0,0,0.3); border-radius: 4px; font-family: var(--cs-font-mono); font-size: 11px; color: var(--cs-emerald); margin-top: 12px;">
+          ● WebRTC Peer Sync: ACTIVE (Broadcasting across devices)
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-test-server-ping" class="btn-secondary">Test Connection</button>
+        <button id="btn-save-cloud-sync" class="btn-primary">Save &amp; Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Preferences Modal -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Editor Preferences</h3>
+        <button id="btn-close-settings" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-content">
+        <div class="form-group">
+          <label class="form-label" for="setting-fontsize">Font Size</label>
+          <select id="setting-fontsize" class="form-input">
+            <option value="13">13px</option>
+            <option value="14" selected>14px (Default)</option>
+            <option value="16">16px</option>
+            <option value="18">18px</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="setting-tabsize">Tab Size</label>
+          <select id="setting-tabsize" class="form-input">
+            <option value="2" selected>2 Spaces</option>
+            <option value="4">4 Spaces</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <span style="font-size: 12.5px;">Word Wrap</span>
+          <input type="checkbox" id="setting-wordwrap" checked>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <span style="font-size: 12.5px;">Typing Sound Effects</span>
+          <input type="checkbox" id="setting-sound" checked>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn-primary">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Nickname Modal -->
+  <div id="modal-nickname" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Change Display Name</h3>
+        <button id="btn-cancel-nickname" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-content">
+        <p class="modal-description">Your name will appear as a live cursor flag to collaborators in this room.</p>
+        <input type="text" id="input-new-nickname" class="form-input" placeholder="e.g. Kaushal" maxlength="20">
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-nickname" class="btn-primary">Save Name</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden compatibility elements to maintain complete JS runtime compatibility -->
+  <div id="view-landing" class="hidden"></div>
+  <div id="view-room" class="hidden"></div>
+  <footer id="app-footer" class="hidden"></footer>
+  <div id="room-nav-controls" class="hidden"></div>
+  <div id="peer-avatars" class="hidden"></div>
+  <span id="global-connection-pill" class="hidden"></span>
+  <span id="global-connection-label" class="hidden"></span>
+  <span id="sync-indicator-dot" class="hidden"></span>
+  <div id="readonly-banner" class="hidden"></div>
+  <span id="badge-execution-mode" class="hidden"></span>
+  <button id="nav-btn-instant-room" class="hidden"></button>
+  <button id="btn-create-or-join" class="hidden"></button>
+  <input type="hidden" id="input-custom-room" value="">
+  <button id="btn-quick-sample-room" class="hidden"></button>
+  <select id="select-theme" class="hidden"><option value="codeshift">Default</option></select>
+  <button id="btn-run-code" class="hidden"></button>
+  <button id="btn-format-code" class="hidden"></button>
+  <button id="btn-take-snapshot" class="hidden"></button>
+  <button id="btn-toggle-sidepanel" class="hidden"></button>
+  <button id="btn-toggle-readonly" class="hidden"></button>
+  <span id="icon-readonly" class="hidden"></span>
+  <span id="label-readonly" class="hidden"></span>
+  <button id="btn-set-room-password" class="hidden"></button>
+  <div id="side-panel" class="hidden"></div>
+  <div class="side-tab hidden" data-tab="tab-console"></div>
+  <div class="tab-pane hidden" id="tab-console"></div>
+  <div id="console-output" class="hidden"></div>
+  <button id="btn-clear-console" class="hidden"></button>
+  <iframe id="preview-iframe" class="hidden"></iframe>
+  <button id="btn-refresh-preview" class="hidden"></button>
+  <input type="hidden" id="input-chat-message" value="">
+  <button id="btn-send-chat" class="hidden"></button>
+  <div id="chat-messages-container" class="hidden"></div>
+  <span id="badge-chat-unread" class="hidden"></span>
+  <div id="snapshots-list" class="hidden"></div>
+  <span id="badge-snapshots-count" class="hidden">0</span>
+  <button id="btn-create-snapshot-modal" class="hidden"></button>
+  <div id="modal-password" class="hidden"></div>
+  <input type="hidden" id="input-room-password" value="">
+  <div id="password-error" class="hidden"></div>
+  <button id="btn-submit-password" class="hidden"></button>
+  <button id="btn-cancel-password" class="hidden"></button>
+  <div id="modal-set-password" class="hidden"></div>
+  <input type="hidden" id="input-new-room-password" value="">
+  <button id="btn-save-room-password" class="hidden"></button>
+  <button id="btn-cancel-set-password" class="hidden"></button>
+  <div id="modal-diff" class="hidden"></div>
+  <div id="diff-viewer" class="hidden"></div>
+  <div id="diff-modal-title" class="hidden"></div>
+  <div id="diff-modal-subtitle" class="hidden"></div>
+  <button id="btn-close-diff-modal" class="hidden"></button>
+  <button id="btn-close-diff" class="hidden"></button>
+  <button id="btn-restore-diff-snapshot" class="hidden"></button>
+  <div id="connection-notice-banner" class="hidden"></div>
+  <div id="connection-notice-text" class="hidden"></div>
+  <button id="btn-banner-config-server" class="hidden"></button>
+  <button id="btn-banner-dismiss" class="hidden"></button>
 
   <script src="app.js"></script>
 </body>

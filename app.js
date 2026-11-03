@@ -1,14 +1,15 @@
 /**
- * CodeShift — Production Client Application & Collaborative Engine
- * "Think together. Code without limits."
+ * CodeShare — Real-Time Collaborative Code Sharing Engine
+ * "Share Code in Real-Time Seamlessly Without Login"
  *
- * Integrates:
- * - Monaco Editor (VS Code engine) with full syntax, code folding, and bracket coloring
- * - Internet-wide WebSocket synchronization with auto-reconnection
- * - Remote cursor decorations and typing indicators
- * - Host permissions, View-Only mode locks, and Password protection
- * - Server-side snapshots and side-by-side visual diffs
- * - Multi-language live execution & sandboxed HTML/CSS preview
+ * Features:
+ * - Instant distraction-free mesh-type code editor
+ * - Keystroke auto-save with visual indicator (● Saved / ● Saving...)
+ * - Serverless multi-device cloud persistence (Firebase Realtime Database)
+ * - Direct WebRTC peer-to-peer sync (PeerJS)
+ * - Native Node.js RFC 6455 WebSocket integration (server.js)
+ * - Monaco Editor (VS Code engine) with full multi-language syntax highlighting
+ * - Zero signup, instant 1-click link sharing
  */
 
 (function () {
@@ -17,206 +18,153 @@
   // --- State Architecture ---
   const state = {
     roomId: null,
-    userId: localStorage.getItem('codeshift_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
-    userName: localStorage.getItem('codeshift_user_name') || 'Kaushal',
-    userColor: localStorage.getItem('codeshift_user_color') || getRandomColor(),
+    userId: localStorage.getItem('codeshare_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
+    userName: localStorage.getItem('codeshare_user_name') || 'Kaushal',
+    userColor: localStorage.getItem('codeshare_user_color') || getRandomColor(),
+    firebaseUrl: localStorage.getItem('codeshare_firebase_url') || '',
     serverUrl: localStorage.getItem('codeshift_ws_server') || (window.CODESHIFT_WS_SERVER || ''),
+    language: localStorage.getItem('codeshare_default_lang') || 'javascript',
     isHost: false,
-    isReadOnly: false,
-    isProtected: false,
-    isAuthenticated: true,
-    peers: new Map(), // peerId -> { userId, userName, userColor, isHost, cursor }
-    language: 'javascript',
-    theme: localStorage.getItem('codeshift_theme') || 'codeshift',
+    peers: new Map(), // peerId -> { userId, userName, userColor }
+    peerJsInstance: null,
+    peerConnections: new Map(),
+    firebaseApp: null,
+    firebaseDb: null,
+    ws: null,
+    wsConnected: false,
+    broadcastChannel: null,
+    isLocalEditing: false,
+    isApplyingRemoteChange: false,
+    autoSaveTimer: null,
+    monacoInstance: null,
     settings: {
       fontSize: parseInt(localStorage.getItem('cs_fontSize') || '14', 10),
       tabSize: parseInt(localStorage.getItem('cs_tabSize') || '2', 10),
       wordWrap: localStorage.getItem('cs_wordWrap') !== 'false',
       sound: localStorage.getItem('cs_sound') !== 'false'
-    },
-    snapshots: [],
-    chatMessages: [],
-    ws: null,
-    wsConnected: false,
-    wsReconnectAttempts: 0,
-    broadcastChannel: null,
-    isApplyingRemoteChange: false,
-    activeSideTab: 'tab-console',
-    monacoInstance: null,
-    monacoDecorations: new Map(), // peerId -> decorationIds
-    remoteCursorWidgets: new Map(),
-    isFullscreen: false
+    }
   };
 
-  localStorage.setItem('codeshift_user_id', state.userId);
-  localStorage.setItem('codeshift_user_color', state.userColor);
+  localStorage.setItem('codeshare_user_id', state.userId);
+  localStorage.setItem('codeshare_user_color', state.userColor);
 
   const DEFAULT_TEMPLATES = {
-    javascript: `// CodeShift • Collaborative JavaScript Environment
-// "Think together. Code without limits."
+    javascript: `// CodeShare • Real-time Collaborative Code Workspace
+// Auto-saves on every keystroke. Share the URL to collaborate instantly!
 
-function analyzeSession(roomId, developerCount) {
-  return {
-    room: roomId,
-    developers: developerCount,
-    latency: "Edge Sub-15ms ⚡",
-    status: "Live & Synchronized"
-  };
+function calculatePrimes(max) {
+  const primes = [];
+  for (let i = 2; i <= max; i++) {
+    let isPrime = true;
+    for (let j = 2; j <= Math.sqrt(i); j++) {
+      if (i % j === 0) { isPrime = false; break; }
+    }
+    if (isPrime) primes.push(i);
+  }
+  return primes;
 }
 
-console.log("🚀 Initializing CodeShift session...");
-const session = analyzeSession("shift-demo", 2);
-console.log("Active Session:", session);
-
-// Try editing or press ⌘+Enter to execute!
+console.log("Primes up to 50:", calculatePrimes(50));
 `,
-    typescript: `// CodeShift • TypeScript Environment
-interface DeveloperSession {
+    typescript: `// CodeShare • TypeScript Environment
+interface SessionConfig {
   roomId: string;
-  host: string;
-  peers: string[];
-  isLocked: boolean;
+  collaborators: number;
+  autoSave: boolean;
 }
 
-const activeRoom: DeveloperSession = {
-  roomId: "production-shift",
-  host: "${state.userName}",
-  peers: ["Alex", "Taylor"],
-  isLocked: false
+const activeSession: SessionConfig = {
+  roomId: "${state.roomId || 'demo'}",
+  collaborators: 2,
+  autoSave: true
 };
 
-console.log("TypeScript Room State:", activeRoom);
+console.log("TypeScript session loaded:", activeSession);
+`,
+    python: `# CodeShare • Python Workspace
+# Auto-saved and synchronized across all connected devices in real time.
+
+def fibonacci(n):
+    sequence = [0, 1]
+    while len(sequence) < n:
+        sequence.append(sequence[-1] + sequence[-2])
+    return sequence
+
+print("Fibonacci sequence:", fibonacci(10))
 `,
     html: `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <title>CodeShare Interactive HTML</title>
   <style>
-    body {
-      background: #0d0e15;
-      color: #f8fafc;
-      font-family: system-ui, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 90vh;
-      margin: 0;
-    }
-    .badge {
-      background: rgba(139, 124, 255, 0.15);
-      border: 1px solid #8b7cff;
-      color: #c084fc;
-      padding: 6px 16px;
-      border-radius: 9999px;
-      font-weight: 700;
-      font-size: 13px;
-    }
-    h1 {
-      margin-top: 18px;
-      font-size: 32px;
-      background: linear-gradient(135deg, #8b7cff, #38bdf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    button {
-      background: #8b7cff;
-      border: none;
-      color: white;
-      padding: 10px 24px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      margin-top: 14px;
-      box-shadow: 0 4px 14px rgba(139, 124, 255, 0.4);
-    }
-    button:hover { background: #7c6dfa; }
+    body { background: #0d0f15; color: #f8fafc; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
+    .card { background: #161a24; border: 1px solid #eb4d4b; padding: 28px; border-radius: 8px; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="badge">CodeShift Live Preview</div>
-  <h1>Think together. Code without limits.</h1>
-  <p>Live synchronized HTML & CSS rendered side-by-side in real-time.</p>
-  <button onclick="alert('CodeShift interactive action triggered!')">Click Action ⚡</button>
+  <div class="card">
+    <h1>CodeShare Real-Time Editor</h1>
+    <p>Live synchronized HTML & CSS rendered across devices.</p>
+  </div>
 </body>
 </html>`,
-    css: `/* CodeShift Cyber Styling */
+    css: `/* CodeShare CSS Styling */
 :root {
-  --primary-violet: #8B7CFF;
-  --cyber-cyan: #38BDF8;
+  --coral-accent: #eb4d4b;
+  --dark-canvas: #0d0f15;
 }
 
-.developer-card {
-  background: rgba(22, 23, 34, 0.85);
-  border: 1px solid rgba(139, 124, 255, 0.25);
-  border-radius: 16px;
-  padding: 24px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+.code-container {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--dark-canvas);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 6px;
 }`,
-    python: `# CodeShift • Python Workspace
-import math
-
-def calculate_primes(limit):
-    primes = []
-    for num in range(2, limit + 1):
-        if all(num % i != 0 for i in range(2, int(math.isqrt(num)) + 1)):
-            primes.append(num)
-    return primes
-
-print("CodeShift Python Engine Ready.")
-print("Primes up to 30:", calculate_primes(30))
-`,
     json: `{
-  "platform": "CodeShift",
-  "version": "2.0.0",
-  "engine": "Monaco Editor (VS Code)",
-  "sync": "Internet-wide WebSockets + Edge Durable Objects",
-  "tagline": "Think together. Code without limits."
+  "service": "CodeShare",
+  "realtime": true,
+  "cloudPersistence": "Firebase & WebRTC Ready",
+  "autoSave": "Instant Debounced Keystroke"
 }`,
-    markdown: `# CodeShift Collaborative Document
-### *Think together. Code without limits.*
-
-Welcome to your shared room!
-
-- **Internet-Wide Collaboration**: Send this room link to any developer worldwide.
-- **Monaco Editor**: Full VS Code shortcuts, code folding, multi-cursor, and bracket matching.
-- **Keyboard Shortcuts**:
-  - \`⌘ + Enter\` / \`Ctrl + Enter\`: Execute code immediately
-  - \`⌘ + S\` / \`Ctrl + S\`: Save a version snapshot checkpoint
-`,
-    rust: `// CodeShift Rust Playground
+    sql: `-- CodeShare SQL Workspace
+SELECT 
+  room_id,
+  code_snippet,
+  collaborators_count,
+  last_updated
+FROM codeshare_sessions
+ORDER BY last_updated DESC;`,
+    rust: `// CodeShare Rust Environment
 fn main() {
-    let framework = "CodeShift";
-    let speed_multiplier = 100;
-    println!("Pairing on {} at {}x efficiency!", framework, speed_multiplier);
+    let app = "CodeShare";
+    println!("Seamless real-time code sharing with {}!", app);
 }`,
-    go: `// CodeShift Go Playground
+    go: `// CodeShare Go Environment
 package main
 import "fmt"
 
 func main() {
-    fmt.Println("CodeShift • Think together. Code without limits.")
+    fmt.Println("CodeShare: Instant code sharing without login.")
 }`,
-    sql: `-- CodeShift Database Workspace
-SELECT 
-  room_id,
-  creator,
-  active_collaborators,
-  created_at
-FROM codeshift_rooms
-WHERE status = 'active'
-ORDER BY active_collaborators DESC;`
+    markdown: `# CodeShare Collaborative Document
+Share code in real-time with developers worldwide.
+- **Auto-Save**: Keystrokes are immediately saved.
+- **Seamless Sync**: Connect multiple computers via WebRTC & Firebase.
+- **One Link**: Send this link to anyone to code together.`,
+    plaintext: `CodeShare — Simple, instant code sharing.
+Type or paste anything here. It auto-saves instantly.`
   };
 
   function getRandomColor() {
-    const palette = ['#8B7CFF', '#38BDF8', '#F43F5E', '#10B981', '#F59E0B', '#C084FC', '#EC4899'];
+    const palette = ['#eb4d4b', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
     return palette[Math.floor(Math.random() * palette.length)];
   }
 
   // --- Sound Synthesizer ---
   const audioCtx = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) ? new (window.AudioContext || window.webkitAudioContext)() : null;
-  function playSound(type) {
+  function playClickSound() {
     if (!state.settings.sound || !audioCtx) return;
     try {
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -224,182 +172,114 @@ ORDER BY active_collaborators DESC;`
       const gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-
       const now = audioCtx.currentTime;
-      if (type === 'blip') {
-        osc.frequency.setValueAtTime(580, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
-        gain.gain.setValueAtTime(0.06, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.start(now);
-        osc.stop(now + 0.08);
-      } else if (type === 'success') {
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.start(now);
-        osc.stop(now + 0.15);
-      }
+      osc.frequency.setValueAtTime(600, now);
+      gain.gain.setValueAtTime(0.02, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.start(now);
+      osc.stop(now + 0.04);
     } catch (e) {}
   }
 
-  // --- UI Toast ---
+  // --- Toast Notification ---
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = 'px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl border backdrop-blur-md flex items-center gap-2 animate-fade-in pointer-events-auto transition-all';
+    toast.className = 'toast-msg';
     
     if (type === 'success') {
-      toast.classList.add('bg-emerald-950/90', 'border-emerald-500/30', 'text-emerald-300');
-      toast.innerHTML = `<span>✓</span><span>${message}</span>`;
+      toast.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      toast.innerHTML = `<span style="color:#10b981;">✓</span> <span>${message}</span>`;
     } else if (type === 'error') {
-      toast.classList.add('bg-rose-950/90', 'border-rose-500/30', 'text-rose-300');
-      toast.innerHTML = `<span>✕</span><span>${message}</span>`;
+      toast.style.borderColor = 'rgba(235, 77, 75, 0.4)';
+      toast.innerHTML = `<span style="color:#eb4d4b;">✕</span> <span>${message}</span>`;
     } else {
-      toast.classList.add('bg-surface-elevated/95', 'border-violet-500/30', 'text-violet-200');
-      toast.innerHTML = `<span>⚡</span><span>${message}</span>`;
+      toast.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+      toast.innerHTML = `<span style="color:#3b82f6;">⚡</span> <span>${message}</span>`;
     }
 
     container.appendChild(toast);
-    playSound('blip');
-
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(8px)';
+      toast.style.transition = 'all 0.2s ease';
       setTimeout(() => toast.remove(), 250);
-    }, 3200);
+    }, 2800);
   }
 
-  // --- DOM Elements ---
+  // --- DOM Elements Cache ---
   const el = {
-    viewLanding: document.getElementById('view-landing'),
-    viewRoom: document.getElementById('view-room'),
-    appFooter: document.getElementById('app-footer'),
-    roomNavControls: document.getElementById('room-nav-controls'),
+    brandLogo: document.getElementById('brand-logo'),
     roomNavId: document.getElementById('room-nav-id'),
-    userNicknameDisplay: document.getElementById('user-nickname-display'),
-    userRoleBadge: document.getElementById('user-role-badge'),
-    peerAvatars: document.getElementById('peer-avatars'),
-    globalConnectionPill: document.getElementById('global-connection-pill'),
-    globalConnectionLabel: document.getElementById('global-connection-label'),
-    syncIndicatorDot: document.getElementById('sync-indicator-dot'),
-    syncStatus: document.getElementById('sync-status'),
-    readonlyBanner: document.getElementById('readonly-banner'),
-    badgeExecutionMode: document.getElementById('badge-execution-mode'),
-    editorEngineLabel: document.getElementById('editor-engine-label'),
-    // Action buttons
-    navBtnInstantRoom: document.getElementById('nav-btn-instant-room'),
-    btnCreateOrJoin: document.getElementById('btn-create-or-join'),
-    btnHeroLaunchRoom: document.getElementById('btn-hero-launch-room'),
-    inputCustomRoom: document.getElementById('input-custom-room'),
-    btnQuickSampleRoom: document.getElementById('btn-quick-sample-room'),
     btnCopyRoomLink: document.getElementById('btn-copy-room-link'),
     btnShareRoom: document.getElementById('btn-share-room'),
-    btnChangeNickname: document.getElementById('btn-change-nickname'),
+    btnHeroLaunchRoom: document.getElementById('btn-hero-launch-room'),
+    saveStatusContainer: document.getElementById('save-status-container'),
+    saveStatusDot: document.getElementById('save-status-dot'),
+    saveStatusText: document.getElementById('save-status-text'),
     selectLanguage: document.getElementById('select-language'),
-    selectTheme: document.getElementById('select-theme'),
-    btnRunCode: document.getElementById('btn-run-code'),
-    btnFormatCode: document.getElementById('btn-format-code'),
-    btnTakeSnapshot: document.getElementById('btn-take-snapshot'),
+    onlineUsersCount: document.getElementById('online-users-count'),
+    userNicknameDisplay: document.getElementById('user-nickname-display'),
+    btnChangeNickname: document.getElementById('btn-change-nickname'),
+    btnOpenCloudSync: document.getElementById('btn-open-cloud-sync'),
+    cloudSyncBadge: document.getElementById('cloud-sync-badge'),
+    btnOpenSettings: document.getElementById('btn-open-settings'),
     btnDownloadCode: document.getElementById('btn-download-code'),
-    btnToggleSidepanel: document.getElementById('btn-toggle-sidepanel'),
     btnToggleFullscreen: document.getElementById('btn-toggle-fullscreen'),
-    btnToggleReadonly: document.getElementById('btn-toggle-readonly'),
-    iconReadonly: document.getElementById('icon-readonly'),
-    labelReadonly: document.getElementById('label-readonly'),
-    btnSetRoomPassword: document.getElementById('btn-set-room-password'),
     // Editor mounts
     monacoContainer: document.getElementById('monaco-editor-container'),
     fallbackWrapper: document.getElementById('fallback-editor-wrapper'),
     editorTextarea: document.getElementById('code-editor-textarea'),
     editorLineNumbers: document.getElementById('editor-line-numbers'),
-    codeStats: document.getElementById('code-stats'),
     cursorPosition: document.getElementById('cursor-position'),
-    sidePanel: document.getElementById('side-panel'),
-    sideTabs: document.querySelectorAll('.side-tab'),
-    tabPanes: document.querySelectorAll('.tab-pane'),
-    consoleOutput: document.getElementById('console-output'),
-    btnClearConsole: document.getElementById('btn-clear-console'),
-    previewIframe: document.getElementById('preview-iframe'),
-    btnRefreshPreview: document.getElementById('btn-refresh-preview'),
-    inputChatMessage: document.getElementById('input-chat-message'),
-    btnSendChat: document.getElementById('btn-send-chat'),
-    chatMessagesContainer: document.getElementById('chat-messages-container'),
-    badgeChatUnread: document.getElementById('badge-chat-unread'),
-    snapshotsList: document.getElementById('snapshots-list'),
-    badgeSnapshotsCount: document.getElementById('badge-snapshots-count'),
-    btnCreateSnapshotModal: document.getElementById('btn-create-snapshot-modal'),
+    codeStats: document.getElementById('code-stats'),
+    syncStatus: document.getElementById('sync-status'),
+    editorEngineLabel: document.getElementById('editor-engine-label'),
     // Modals
-    modalPassword: document.getElementById('modal-password'),
-    inputRoomPassword: document.getElementById('input-room-password'),
-    passwordError: document.getElementById('password-error'),
-    btnSubmitPassword: document.getElementById('btn-submit-password'),
-    btnCancelPassword: document.getElementById('btn-cancel-password'),
-    modalSetPassword: document.getElementById('modal-set-password'),
-    inputNewRoomPassword: document.getElementById('input-new-room-password'),
-    btnSaveRoomPassword: document.getElementById('btn-save-room-password'),
-    btnCancelSetPassword: document.getElementById('btn-cancel-set-password'),
-    modalDiff: document.getElementById('modal-diff'),
-    diffViewer: document.getElementById('diff-viewer'),
-    diffModalTitle: document.getElementById('diff-modal-title'),
-    diffModalSubtitle: document.getElementById('diff-modal-subtitle'),
-    btnCloseDiffModal: document.getElementById('btn-close-diff-modal'),
-    btnCloseDiff: document.getElementById('btn-close-diff'),
-    btnRestoreDiffSnapshot: document.getElementById('btn-restore-diff-snapshot'),
-    modalNickname: document.getElementById('modal-nickname'),
-    inputNewNickname: document.getElementById('input-new-nickname'),
-    btnSaveNickname: document.getElementById('btn-save-nickname'),
-    btnCancelNickname: document.getElementById('btn-cancel-nickname'),
-    modalSettings: document.getElementById('modal-settings'),
-    btnOpenSettings: document.getElementById('btn-open-settings'),
-    btnCloseSettings: document.getElementById('btn-close-settings'),
-    btnSaveSettings: document.getElementById('btn-save-settings'),
-    settingFontsize: document.getElementById('setting-fontsize'),
-    settingTabsize: document.getElementById('setting-tabsize'),
-    settingWordwrap: document.getElementById('setting-wordwrap'),
-    settingSound: document.getElementById('setting-sound'),
-    settingServerUrl: document.getElementById('setting-server-url'),
-    btnTestServerPing: document.getElementById('btn-test-server-ping'),
-    connectionNoticeBanner: document.getElementById('connection-notice-banner'),
-    connectionNoticeText: document.getElementById('connection-notice-text'),
-    btnBannerConfigServer: document.getElementById('btn-banner-config-server'),
-    btnBannerDismiss: document.getElementById('btn-banner-dismiss'),
-    // Codeshare Drawers
-    drawerSettings: document.getElementById('drawer-settings'),
-    btnCloseDrawerSettings: document.getElementById('btn-close-drawer-settings'),
-    drawerChat: document.getElementById('drawer-chat'),
-    btnToggleChat: document.getElementById('btn-toggle-chat'),
-    btnCloseDrawerChat: document.getElementById('btn-close-drawer-chat'),
-    drawerConsole: document.getElementById('drawer-console'),
-    btnToggleConsole: document.getElementById('btn-toggle-console'),
-    btnCloseDrawerConsole: document.getElementById('btn-close-drawer-console'),
-    tabBtnConsole: document.getElementById('tab-btn-console'),
-    tabBtnPreview: document.getElementById('tab-btn-preview'),
-    // Codeshare Share Modal
     modalShare: document.getElementById('modal-share'),
     inputShareLink: document.getElementById('input-share-link'),
     btnModalCopyLink: document.getElementById('btn-modal-copy-link'),
     btnModalDoneShare: document.getElementById('btn-modal-done-share'),
-    btnCloseShare: document.getElementById('btn-close-share')
+    btnCloseShare: document.getElementById('btn-close-share'),
+    modalCloudSync: document.getElementById('modal-cloud-sync'),
+    inputFirebaseUrl: document.getElementById('input-firebase-url'),
+    settingServerUrl: document.getElementById('setting-server-url'),
+    btnSaveCloudSync: document.getElementById('btn-save-cloud-sync'),
+    btnTestServerPing: document.getElementById('btn-test-server-ping'),
+    btnCloseCloudSync: document.getElementById('btn-close-cloud-sync'),
+    syncDiagnostics: document.getElementById('sync-diagnostics'),
+    modalSettings: document.getElementById('modal-settings'),
+    settingFontsize: document.getElementById('setting-fontsize'),
+    settingTabsize: document.getElementById('setting-tabsize'),
+    settingWordwrap: document.getElementById('setting-wordwrap'),
+    settingSound: document.getElementById('setting-sound'),
+    btnSaveSettings: document.getElementById('btn-save-settings'),
+    btnCloseSettings: document.getElementById('btn-close-settings'),
+    modalNickname: document.getElementById('modal-nickname'),
+    inputNewNickname: document.getElementById('input-new-nickname'),
+    btnSaveNickname: document.getElementById('btn-save-nickname'),
+    btnCancelNickname: document.getElementById('btn-cancel-nickname')
   };
 
-  // --- Router ---
+  // --- Router & Room Management ---
   function initRouter() {
     window.addEventListener('hashchange', handleRoute);
     handleRoute();
   }
 
   function handleRoute() {
-    // Check URL search or hash for server relay parameter
+    // 1. Check for parameters (e.g. server, fb, lang)
     try {
       const searchParams = new URLSearchParams(window.location.search);
-      const sParam = searchParams.get('server');
-      if (sParam && sParam !== state.serverUrl) {
-        state.serverUrl = sParam;
-        localStorage.setItem('codeshift_ws_server', sParam);
+      if (searchParams.get('fb')) {
+        state.firebaseUrl = searchParams.get('fb');
+        localStorage.setItem('codeshare_firebase_url', state.firebaseUrl);
+      }
+      if (searchParams.get('server')) {
+        state.serverUrl = searchParams.get('server');
+        localStorage.setItem('codeshift_ws_server', state.serverUrl);
       }
     } catch (e) {}
 
@@ -408,62 +288,62 @@ ORDER BY active_collaborators DESC;`
     if (queryPart) {
       try {
         const hashParams = new URLSearchParams(queryPart);
-        const sParam = hashParams.get('server');
-        if (sParam && sParam !== state.serverUrl) {
-          state.serverUrl = sParam;
-          localStorage.setItem('codeshift_ws_server', sParam);
+        if (hashParams.get('fb')) {
+          state.firebaseUrl = hashParams.get('fb');
+          localStorage.setItem('codeshare_firebase_url', state.firebaseUrl);
+        }
+        if (hashParams.get('server')) {
+          state.serverUrl = hashParams.get('server');
+          localStorage.setItem('codeshift_ws_server', state.serverUrl);
         }
       } catch (e) {}
     }
 
     const cleanPath = (pathPart || '').replace(/^\/+/, '').trim();
 
-    if (cleanPath === 'new') {
-      navigateToRoom(generateRoomSlug());
+    // If root or new, generate instant room slug
+    if (!cleanPath || cleanPath === 'new') {
+      const newSlug = generateRoomSlug();
+      window.location.hash = `/${newSlug}`;
       return;
     }
 
-    const reservedRoutes = ['pricing', 'signup', 'login', 'privacy', 'terms', ''];
-    if (cleanPath.startsWith('room/')) {
-      const roomId = decodeURIComponent(cleanPath.slice(5).trim()) || 'general';
-      enterRoom(roomId);
-    } else if (cleanPath && !reservedRoutes.includes(cleanPath)) {
-      enterRoom(cleanPath);
-    } else {
-      enterLanding();
-    }
-  }
-
-  function enterLanding() {
-    state.roomId = null;
-    closeWebSocket();
-    if (state.broadcastChannel) {
-      state.broadcastChannel.close();
-      state.broadcastChannel = null;
-    }
-    el.viewLanding.classList.remove('hidden');
-    el.viewRoom.classList.add('hidden');
-    document.title = "Codeshare — Share Code in Real-time with Developers";
-    setConnectionStatus('live', 'Online');
+    const roomId = cleanPath.startsWith('room/') ? cleanPath.slice(5) : cleanPath;
+    enterRoom(decodeURIComponent(roomId));
   }
 
   function enterRoom(roomId) {
+    if (state.roomId === roomId) return;
     state.roomId = roomId;
-    el.viewLanding.classList.add('hidden');
-    el.viewRoom.classList.remove('hidden');
 
-    el.roomNavId.textContent = '/' + roomId;
-    el.userNicknameDisplay.textContent = state.userName;
-    document.title = `Codeshare • /${roomId}`;
+    // Update UI elements
+    if (el.roomNavId) el.roomNavId.textContent = '/' + roomId;
+    if (el.userNicknameDisplay) el.userNicknameDisplay.textContent = `(${state.userName})`;
+    document.title = `CodeShare • /${roomId}`;
 
-    // Initialize Monaco if ready, otherwise fallback
-    initMonacoEditor(DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript);
+    // Load cached code from localStorage if available
+    const cachedCode = localStorage.getItem(`cs_code_${roomId}`);
+    const cachedLang = localStorage.getItem(`cs_lang_${roomId}`);
+    if (cachedLang) {
+      state.language = cachedLang;
+      if (el.selectLanguage) el.selectLanguage.value = cachedLang;
+    }
 
-    // Connect real-time WebSocket to room
+    const initialCode = cachedCode !== null ? cachedCode : (DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript);
+
+    // Initialize Monaco Editor
+    initMonacoEditor(initialCode);
+
+    // Initialize Real-Time Synchronization Engines:
+    // 1. Firebase Realtime Database
+    initFirebaseSync(roomId);
+    // 2. Direct WebRTC Peer Sync (PeerJS)
+    initPeerSync(roomId);
+    // 3. Native WebSocket Server (if running)
     connectWebSocket(roomId);
 
-    updateExecutionBadge();
-    showToast(`Entering room /${roomId}...`, 'info');
+    updateSaveIndicator('saved', 'Auto-Save Ready');
+    showToast(`Connected to room /${roomId}`, 'info');
   }
 
   function navigateToRoom(roomId) {
@@ -471,16 +351,31 @@ ORDER BY active_collaborators DESC;`
   }
 
   function generateRoomSlug() {
-    const prefixes = ['shift', 'knot', 'pair', 'flow', 'dev', 'code'];
+    const prefixes = ['knot', 'pair', 'flow', 'dev', 'shift', 'sync', 'hack', 'code'];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const num = Math.floor(1000 + Math.random() * 9000);
+    const num = Math.random().toString(36).substring(2, 6);
     return `${prefix}-${num}`;
   }
 
-  // --- Monaco Editor Engine ---
-  let monacoLoaded = false;
+  // --- Auto-Save Indicator ---
+  function updateSaveIndicator(status, text) {
+    if (!el.saveStatusDot || !el.saveStatusText) return;
+    if (status === 'saving') {
+      el.saveStatusDot.className = 'status-dot saving';
+      el.saveStatusText.textContent = text || 'Saving...';
+    } else {
+      el.saveStatusDot.className = 'status-dot saved';
+      el.saveStatusText.textContent = text || 'Saved';
+    }
+  }
+
+  // --- Monaco Editor Initialization ---
   function initMonacoEditor(initialCode) {
-    if (state.monacoInstance) return;
+    if (state.monacoInstance) {
+      state.monacoInstance.setValue(initialCode);
+      updateLanguageInMonaco(state.language);
+      return;
+    }
 
     if (window.require && typeof window.require.config === 'function') {
       try {
@@ -497,7 +392,7 @@ ORDER BY active_collaborators DESC;`
           state.monacoInstance = monaco.editor.create(container, {
             value: initialCode,
             language: mapLanguageToMonaco(state.language),
-            theme: 'codeshift-dark',
+            theme: 'codeshare-mesh',
             automaticLayout: true,
             fontSize: state.settings.fontSize,
             fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace",
@@ -511,89 +406,73 @@ ORDER BY active_collaborators DESC;`
             bracketPairColorization: { enabled: true },
             autoClosingBrackets: 'always',
             tabSize: state.settings.tabSize,
-            wordWrap: state.settings.wordWrap ? 'on' : 'off',
-            readOnly: state.isReadOnly && !state.isHost
+            wordWrap: state.settings.wordWrap ? 'on' : 'off'
           });
 
-          monacoLoaded = true;
           el.fallbackWrapper.classList.add('hidden');
           el.editorEngineLabel.textContent = 'Monaco Engine (VS Code)';
 
-          // Listen for local changes
+          // Local typing listener
           state.monacoInstance.onDidChangeModelContent(() => {
             if (state.isApplyingRemoteChange) return;
             const code = state.monacoInstance.getValue();
-            onCodeChange(code);
+            onLocalCodeChange(code);
           });
 
-          // Listen for cursor position
+          // Cursor tracking
           state.monacoInstance.onDidChangeCursorPosition((e) => {
             const pos = e.position;
             const model = state.monacoInstance.getModel();
             const lines = model.getLineCount();
             el.cursorPosition.textContent = `Ln ${pos.lineNumber}, Col ${pos.column}`;
             el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
-
-            // Broadcast cursor
-            sendWsMessage({
-              type: 'CURSOR_MOVE',
-              line: pos.lineNumber,
-              col: pos.column,
-              selection: state.monacoInstance.getSelection()
-            });
-          });
-
-          // Command shortcut: Run Code (⌘+Enter)
-          state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            runCurrentCode();
-          });
-
-          // Command shortcut: Save Snapshot (⌘+S)
-          state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-            promptSaveSnapshot();
           });
 
           updateCodeStats();
         });
         return;
       } catch (err) {
-        console.warn('Monaco failed to load from CDN, activating fallback editor:', err);
+        console.warn('Monaco loading from CDN failed, using fallback:', err);
       }
     }
 
-    // Fallback: If Monaco is offline or loading
+    // Fallback Editor
     el.fallbackWrapper.classList.remove('hidden');
     el.monacoContainer.classList.add('hidden');
     el.editorTextarea.value = initialCode;
-    el.editorEngineLabel.textContent = 'Standard Editor';
+    el.editorEngineLabel.textContent = 'Native Code Area';
     updateLineNumbers();
     updateCodeStats();
+
+    el.editorTextarea.addEventListener('input', () => {
+      if (state.isApplyingRemoteChange) return;
+      onLocalCodeChange(el.editorTextarea.value);
+    });
   }
 
   function defineMonacoTheme() {
-    monaco.editor.defineTheme('codeshift-dark', {
+    monaco.editor.defineTheme('codeshare-mesh', {
       base: 'vs-dark',
       inherit: true,
       rules: [
         { token: 'comment', foreground: '64748B', fontStyle: 'italic' },
-        { token: 'keyword', foreground: 'C084FC', fontStyle: 'bold' },
-        { token: 'string', foreground: '34D399' },
+        { token: 'keyword', foreground: 'EB4D4B', fontStyle: 'bold' },
+        { token: 'string', foreground: '10B981' },
         { token: 'number', foreground: 'F59E0B' },
-        { token: 'type', foreground: '38BDF8' },
-        { token: 'function', foreground: '8B7CFF' },
+        { token: 'type', foreground: '3B82F6' },
+        { token: 'function', foreground: '8B5CF6' },
         { token: 'identifier', foreground: 'F8FAFC' }
       ],
       colors: {
-        'editor.background': '#0D0E15',
+        'editor.background': '#11141C00',
         'editor.foreground': '#F8FAFC',
         'editorLineNumber.foreground': '#475569',
-        'editorLineNumber.activeForeground': '#8B7CFF',
-        'editor.lineHighlightBackground': '#141524',
-        'editorCursor.foreground': '#8B7CFF',
-        'editor.selectionBackground': '#8B7CFF33',
-        'editor.inactiveSelectionBackground': '#8B7CFF20',
-        'editorWidget.background': '#161724',
-        'editorWidget.border': '#252738'
+        'editorLineNumber.activeForeground': '#EB4D4B',
+        'editor.lineHighlightBackground': '#1A1E2960',
+        'editorCursor.foreground': '#EB4D4B',
+        'editor.selectionBackground': '#EB4D4B33',
+        'editorWidget.background': '#161A24',
+        'editorWidget.border': '#252936'
       }
     });
   }
@@ -615,9 +494,7 @@ ORDER BY active_collaborators DESC;`
   }
 
   function getEditorCode() {
-    if (state.monacoInstance) {
-      return state.monacoInstance.getValue();
-    }
+    if (state.monacoInstance) return state.monacoInstance.getValue();
     return el.editorTextarea.value;
   }
 
@@ -637,9 +514,211 @@ ORDER BY active_collaborators DESC;`
     }, 100);
   }
 
-  // --- Real-Time WebSocket Collaborative Engine ---
+  function updateLineNumbers() {
+    const text = el.editorTextarea.value;
+    const lines = text.split('\n').length;
+    let nums = '';
+    for (let i = 1; i <= lines; i++) nums += i + '\n';
+    el.editorLineNumbers.innerText = nums;
+    el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
+  }
+
+  function updateCodeStats() {
+    const code = getEditorCode();
+    const lines = (code || '').split('\n').length;
+    if (el.codeStats) el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
+  }
+
+  function updateLanguageInMonaco(lang) {
+    if (state.monacoInstance) {
+      const model = state.monacoInstance.getModel();
+      monaco.editor.setModelLanguage(model, mapLanguageToMonaco(lang));
+    }
+  }
+
+  // --- Local Typing & Instant Auto-Save Engine ---
+  function onLocalCodeChange(code) {
+    updateLineNumbers();
+    updateCodeStats();
+    playClickSound();
+
+    // Trigger visual saving indicator
+    updateSaveIndicator('saving', 'Saving...');
+
+    clearTimeout(state.autoSaveTimer);
+    state.autoSaveTimer = setTimeout(() => {
+      // 1. Save to LocalStorage cache
+      try {
+        localStorage.setItem(`cs_code_${state.roomId}`, code);
+        localStorage.setItem(`cs_lang_${state.roomId}`, state.language);
+      } catch (e) {}
+
+      // 2. Save to Firebase Realtime Database
+      if (state.firebaseDb && state.roomId) {
+        state.firebaseDb.ref('codeshare_rooms/' + state.roomId).update({
+          code: code,
+          language: state.language,
+          author: state.userName,
+          updatedAt: Date.now()
+        }).then(() => {
+          updateSaveIndicator('saved', 'Saved in Cloud (Firebase)');
+        }).catch(() => {
+          updateSaveIndicator('saved', 'Saved Locally');
+        });
+      } else {
+        updateSaveIndicator('saved', 'Saved Locally & Peers');
+      }
+
+      // 3. Broadcast to all WebRTC Peers
+      broadcastToPeers({
+        type: 'SYNC_DOC',
+        code: code,
+        language: state.language,
+        userId: state.userId,
+        userName: state.userName
+      });
+
+      // 4. Broadcast via Native WebSocket / BroadcastChannel
+      sendWsMessage({
+        type: 'SYNC_DOC',
+        code: code,
+        language: state.language
+      });
+
+    }, 280);
+  }
+
+  // --- 1. Firebase Realtime Database Engine ---
+  function initFirebaseSync(roomId) {
+    const dbUrl = (state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || '').trim();
+    if (!dbUrl || typeof firebase === 'undefined') {
+      if (el.cloudSyncBadge) el.cloudSyncBadge.textContent = 'Cloud Sync (Setup)';
+      return;
+    }
+
+    try {
+      if (!state.firebaseApp) {
+        state.firebaseApp = firebase.initializeApp({ databaseURL: dbUrl }, 'cs_app_' + Date.now());
+        state.firebaseDb = state.firebaseApp.database();
+        if (el.cloudSyncBadge) el.cloudSyncBadge.textContent = 'Firebase Synced 🟢';
+      }
+
+      const roomRef = state.firebaseDb.ref('codeshare_rooms/' + roomId);
+
+      // Listen for remote updates
+      roomRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val && val.code !== undefined && !state.isApplyingRemoteChange) {
+          if (val.code !== getEditorCode()) {
+            setEditorCode(val.code);
+            if (val.language && val.language !== state.language) {
+              state.language = val.language;
+              el.selectLanguage.value = val.language;
+              updateLanguageInMonaco(val.language);
+            }
+            updateSaveIndicator('saved', 'Synced with Cloud');
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('Firebase init error:', err);
+    }
+  }
+
+  // --- 2. Direct WebRTC Peer Sync (PeerJS) ---
+  function initPeerSync(roomId) {
+    if (typeof Peer === 'undefined') return;
+
+    try {
+      const myPeerId = `cs_${roomId}_${state.userId}`;
+      if (state.peerJsInstance) state.peerJsInstance.destroy();
+
+      const peer = new Peer(myPeerId, { debug: 0 });
+      state.peerJsInstance = peer;
+
+      peer.on('open', (id) => {
+        updatePeerCounter();
+        // Try connecting to known room host / peers
+        const targetHostId = `cs_${roomId}_host`;
+        if (myPeerId !== targetHostId) {
+          const conn = peer.connect(targetHostId);
+          setupPeerConnection(conn);
+        }
+      });
+
+      peer.on('connection', (conn) => {
+        setupPeerConnection(conn);
+      });
+
+      peer.on('error', (err) => {
+        // If ID taken, register as guest peer
+        if (err.type === 'unavailable-id') {
+          const guestId = `cs_${roomId}_g_${Math.random().toString(36).substring(2, 6)}`;
+          state.peerJsInstance = new Peer(guestId, { debug: 0 });
+          state.peerJsInstance.on('connection', setupPeerConnection);
+        }
+      });
+    } catch (e) {
+      console.warn('PeerJS init failed:', e);
+    }
+  }
+
+  function setupPeerConnection(conn) {
+    conn.on('open', () => {
+      state.peerConnections.set(conn.peer, conn);
+      updatePeerCounter();
+
+      // Send initial document state to new peer
+      conn.send({
+        type: 'SYNC_DOC',
+        code: getEditorCode(),
+        language: state.language,
+        userId: state.userId,
+        userName: state.userName
+      });
+    });
+
+    conn.on('data', (data) => {
+      if (!data) return;
+      if (data.type === 'SYNC_DOC' && data.userId !== state.userId) {
+        if (data.code !== getEditorCode()) {
+          setEditorCode(data.code);
+          if (data.language && data.language !== state.language) {
+            state.language = data.language;
+            el.selectLanguage.value = data.language;
+            updateLanguageInMonaco(data.language);
+          }
+          updateSaveIndicator('saved', `Synced from ${data.userName || 'peer'}`);
+        }
+      }
+    });
+
+    conn.on('close', () => {
+      state.peerConnections.delete(conn.peer);
+      updatePeerCounter();
+    });
+  }
+
+  function broadcastToPeers(payload) {
+    for (const [_, conn] of state.peerConnections) {
+      if (conn && conn.open) {
+        try { conn.send(payload); } catch (e) {}
+      }
+    }
+  }
+
+  function updatePeerCounter() {
+    const count = 1 + state.peerConnections.size;
+    if (el.onlineUsersCount) {
+      el.onlineUsersCount.textContent = `${count} ${count === 1 ? 'user' : 'users'} online`;
+    }
+    if (el.syncStatus) {
+      el.syncStatus.textContent = count > 1 ? `Peer Mesh Connected (${count})` : 'Mesh Ready (Share link to pair)';
+    }
+  }
+
+  // --- 3. Native WebSocket & BroadcastChannel Engine ---
   function getWebSocketUrl(roomId) {
-    // 1. Explicit custom server (configured in Settings, URL param, or localStorage)
     const customServer = (state.serverUrl || localStorage.getItem('codeshift_ws_server') || window.CODESHIFT_WS_SERVER || '').trim();
     if (customServer) {
       let clean = customServer.replace(/\/$/, '');
@@ -655,87 +734,45 @@ ORDER BY active_collaborators DESC;`
     const wsProto = isSecure ? 'wss:' : 'ws:';
     const host = location.host;
 
-    // 2. If running on local server (e.g. localhost:3000) or custom domain VPS
     if (host && !host.includes('github.io')) {
       return `${wsProto}//${host}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
     }
 
-    // 3. Static GitHub Pages fallback endpoint or broadcast
     return null;
-  }
-
-  function showConnectionBanner(show, text) {
-    if (!el.connectionNoticeBanner) return;
-    if (show) {
-      if (text && el.connectionNoticeText) el.connectionNoticeText.textContent = text;
-      el.connectionNoticeBanner.classList.remove('hidden');
-      el.connectionNoticeBanner.classList.add('flex');
-    } else {
-      el.connectionNoticeBanner.classList.add('hidden');
-      el.connectionNoticeBanner.classList.remove('flex');
-    }
   }
 
   function connectWebSocket(roomId) {
     closeWebSocket();
+    activateBroadcastChannel(roomId);
 
     const wsUrl = getWebSocketUrl(roomId);
-
-    if (!wsUrl) {
-      // Running on static GitHub Pages without backend: activate BroadcastChannel
-      activateBroadcastChannel(roomId);
-      setConnectionStatus('local', 'Local Tabs Sync');
-      const isGH = location.host.includes('github.io');
-      showConnectionBanner(isGH, 'Static GitHub Pages: Syncing across local tabs. To pair across different computers, connect a WebSocket server.');
-      return;
-    }
-
-    showConnectionBanner(false);
-    setConnectionStatus('connecting', 'Connecting...');
+    if (!wsUrl) return;
 
     try {
       state.ws = new WebSocket(wsUrl);
-
       state.ws.onopen = () => {
         state.wsConnected = true;
-        state.wsReconnectAttempts = 0;
-        setConnectionStatus('connected', 'Live WebSocket');
-        showConnectionBanner(false);
-        showToast('Connected to CodeShift Internet Room ⚡', 'success');
+        if (el.syncStatus) el.syncStatus.textContent = 'Live Server WebSocket ⚡';
       };
-
       state.ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          handleServerMessage(msg);
-        } catch (e) {
-          console.warn('Invalid server message:', e);
-        }
+          if (msg.type === 'DOC_UPDATED' || msg.type === 'ROOM_INIT') {
+            if (msg.code !== undefined && msg.code !== getEditorCode()) {
+              setEditorCode(msg.code);
+              if (msg.language) {
+                state.language = msg.language;
+                el.selectLanguage.value = msg.language;
+                updateLanguageInMonaco(msg.language);
+              }
+              updateSaveIndicator('saved', 'Synced from Server');
+            }
+          }
+        } catch (e) {}
       };
-
-      state.ws.onclose = () => {
-        state.wsConnected = false;
-        setConnectionStatus('reconnecting', 'Reconnecting...');
-        // Exponential backoff
-        const timeout = Math.min(1000 * Math.pow(1.5, state.wsReconnectAttempts), 10000);
-        state.wsReconnectAttempts++;
-        setTimeout(() => {
-          if (state.roomId === roomId) connectWebSocket(roomId);
-        }, timeout);
-      };
-
-      state.ws.onerror = () => {
-        state.wsConnected = false;
-        // Fallback to BroadcastChannel
-        activateBroadcastChannel(roomId);
-        setConnectionStatus('local', 'Local Sync (Offline)');
-        showConnectionBanner(true, 'WebSocket connection failed. Falling back to local device sync. Check backend server in Preferences.');
-      };
-    } catch (e) {
-      activateBroadcastChannel(roomId);
-      setConnectionStatus('local', 'Local Sync (Offline)');
-      showConnectionBanner(true, 'Could not establish WebSocket. Using local sync.');
-    }
+      state.ws.onclose = () => { state.wsConnected = false; };
+      state.ws.onerror = () => { state.wsConnected = false; };
+    } catch (e) {}
   }
 
   function closeWebSocket() {
@@ -750,685 +787,58 @@ ORDER BY active_collaborators DESC;`
   function sendWsMessage(data) {
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify(data));
-    } else if (state.broadcastChannel) {
+    }
+    if (state.broadcastChannel) {
       state.broadcastChannel.postMessage(data);
     }
   }
 
   function activateBroadcastChannel(roomId) {
     if (state.broadcastChannel) state.broadcastChannel.close();
-    state.broadcastChannel = new BroadcastChannel(`codeshift_room_${roomId}`);
+    state.broadcastChannel = new BroadcastChannel(`codeshare_${roomId}`);
     state.broadcastChannel.onmessage = (event) => {
-      handleServerMessage(event.data);
+      const msg = event.data;
+      if (msg && msg.type === 'SYNC_DOC' && msg.code !== getEditorCode()) {
+        setEditorCode(msg.code);
+        updateSaveIndicator('saved', 'Synced (Local Tab)');
+      }
     };
   }
 
-  function setConnectionStatus(type, label) {
-    el.syncStatus.textContent = label;
-    el.globalConnectionLabel.textContent = label;
-
-    if (type === 'connected') {
-      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-    } else if (type === 'connecting' || type === 'reconnecting') {
-      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
-      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20';
-    } else {
-      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-cyan-400';
-      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
-    }
-  }
-
-  // --- Server Message Dispatcher ---
-  function handleServerMessage(msg) {
-    if (!msg) return;
-
-    switch (msg.type) {
-      case 'ROOM_INIT': {
-        // Apply server document
-        if (msg.code !== undefined) {
-          setEditorCode(msg.code);
-        }
-        if (msg.language) {
-          state.language = msg.language;
-          el.selectLanguage.value = msg.language;
-          updateLanguageInMonaco(msg.language);
-          updateExecutionBadge();
-        }
-
-        state.isHost = !!msg.isHost;
-        state.isReadOnly = !!msg.isReadOnly;
-        state.isProtected = !!msg.isProtected;
-
-        updateHostUI();
-        updateReadOnlyUI();
-
-        // Populate peers
-        state.peers.clear();
-        if (Array.isArray(msg.peers)) {
-          msg.peers.forEach(p => {
-            if (p.userId !== state.userId) {
-              state.peers.set(p.userId, p);
-            }
-          });
-        }
-        renderPeers();
-
-        // Populate snapshots & chat
-        if (Array.isArray(msg.snapshots)) {
-          state.snapshots = msg.snapshots;
-          renderSnapshotsList();
-        }
-        if (Array.isArray(msg.chat)) {
-          state.chatMessages = msg.chat;
-          renderAllChatMessages();
-        }
-
-        // Check if password required
-        if (state.isProtected && !state.isAuthenticated && !state.isHost) {
-          openPasswordModal();
-        }
-        break;
-      }
-
-      case 'DOC_UPDATED': {
-        if (msg.userId !== state.userId) {
-          setEditorCode(msg.code);
-          showToast(`${msg.userName || 'Collaborator'} updated the code`, 'info');
-        }
-        break;
-      }
-
-      case 'LANGUAGE_UPDATED': {
-        state.language = msg.language;
-        el.selectLanguage.value = msg.language;
-        updateLanguageInMonaco(msg.language);
-        updateExecutionBadge();
-        showToast(`Language set to ${msg.language}`, 'info');
-        break;
-      }
-
-      case 'PEER_JOIN': {
-        const p = msg.peer;
-        if (p && p.userId !== state.userId) {
-          state.peers.set(p.userId, p);
-          renderPeers();
-          showToast(`${p.userName} connected to the room!`, 'success');
-        }
-        break;
-      }
-
-      case 'PEER_LEAVE': {
-        state.peers.delete(msg.userId);
-        removeRemoteMonacoCursor(msg.userId);
-        renderPeers();
-        break;
-      }
-
-      case 'PEER_CURSOR': {
-        if (msg.userId !== state.userId) {
-          renderRemoteMonacoCursor(msg.userId, msg.userName, msg.userColor, msg.cursor);
-        }
-        break;
-      }
-
-      case 'NEW_CHAT_MESSAGE': {
-        appendChatMessage(msg.message.userName, msg.message.userColor, msg.message.text, msg.message.time, msg.message.userId === state.userId);
-        playSound('blip');
-        if (state.activeSideTab !== 'tab-chat') {
-          el.badgeChatUnread.classList.remove('hidden');
-        }
-        break;
-      }
-
-      case 'SNAPSHOT_SAVED': {
-        state.snapshots.unshift(msg.snapshot);
-        renderSnapshotsList();
-        showToast(`Checkpoint saved: "${msg.snapshot.title}"`, 'info');
-        break;
-      }
-
-      case 'ROOM_READ_ONLY_CHANGED': {
-        state.isReadOnly = !!msg.isReadOnly;
-        updateReadOnlyUI();
-        showToast(state.isReadOnly ? 'Room locked in View-Only mode' : 'Room unlocked for editing', 'info');
-        break;
-      }
-
-      case 'ROOM_SECURITY_UPDATED': {
-        state.isProtected = !!msg.isProtected;
-        showToast(state.isProtected ? 'Password protection enabled' : 'Password protection removed', 'info');
-        break;
-      }
-
-      case 'HOST_CHANGED': {
-        if (msg.newHostUserId === state.userId) {
-          state.isHost = true;
-          updateHostUI();
-          showToast('You are now the room host 👑', 'success');
-        }
-        break;
-      }
-
-      case 'PASSWORD_VERIFIED': {
-        if (msg.success) {
-          state.isAuthenticated = true;
-          el.modalPassword.classList.add('hidden');
-          el.modalPassword.classList.remove('flex');
-          showToast('Room unlocked!', 'success');
-        } else {
-          el.passwordError.classList.remove('hidden');
-        }
-        break;
-      }
-
-      case 'PERMISSION_DENIED': {
-        showToast(msg.message || 'Permission denied', 'error');
-        break;
-      }
-    }
-  }
-
-  // --- Remote Monaco Cursors ---
-  function renderRemoteMonacoCursor(userId, name, color, cursor) {
-    if (!state.monacoInstance || !cursor) return;
-
-    // Use Monaco decorations
-    const line = cursor.line || 1;
-    const col = cursor.col || 1;
-
-    const decorations = [
-      {
-        range: new monaco.Range(line, col, line, col + 1),
-        options: {
-          className: `monaco-remote-cursor`,
-          hoverMessage: { value: `${name} ✍️` }
-        }
-      }
-    ];
-
-    if (cursor.selection) {
-      const sel = cursor.selection;
-      decorations.push({
-        range: new monaco.Range(sel.startLineNumber, sel.startColumn, sel.endLineNumber, sel.endColumn),
-        options: {
-          className: 'monaco-remote-selection'
-        }
-      });
-    }
-
-    const prevDecorations = state.monacoDecorations.get(userId) || [];
-    const newDecorations = state.monacoInstance.deltaDecorations(prevDecorations, decorations);
-    state.monacoDecorations.set(userId, newDecorations);
-  }
-
-  function removeRemoteMonacoCursor(userId) {
-    if (!state.monacoInstance) return;
-    const prev = state.monacoDecorations.get(userId);
-    if (prev) {
-      state.monacoInstance.deltaDecorations(prev, []);
-      state.monacoDecorations.delete(userId);
-    }
-  }
-
-  // --- Peer Presence UI ---
-  function renderPeers() {
-    el.peerAvatars.innerHTML = '';
-
-    // Self Avatar
-    const selfBadge = document.createElement('div');
-    selfBadge.className = 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#13141E] shadow cursor-pointer';
-    selfBadge.style.backgroundColor = state.userColor;
-    selfBadge.title = `${state.userName} (You)`;
-    selfBadge.textContent = state.userName.charAt(0).toUpperCase();
-    el.peerAvatars.appendChild(selfBadge);
-
-    // Remote Peers
-    state.peers.forEach((peer) => {
-      const badge = document.createElement('div');
-      badge.className = 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#13141E] shadow';
-      badge.style.backgroundColor = peer.userColor;
-      badge.title = `${peer.userName}${peer.isHost ? ' (Host)' : ''}`;
-      badge.textContent = peer.userName.charAt(0).toUpperCase();
-      el.peerAvatars.appendChild(badge);
-    });
-  }
-
-  function updateHostUI() {
-    if (state.isHost) {
-      el.userRoleBadge.textContent = '👑 Host';
-      el.userRoleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30';
-      el.btnToggleReadonly.classList.remove('hidden');
-      el.btnToggleReadonly.classList.add('flex');
-      el.btnSetRoomPassword.classList.remove('hidden');
-      el.btnSetRoomPassword.classList.add('flex');
-    } else {
-      el.userRoleBadge.textContent = '👤 Collaborator';
-      el.userRoleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700';
-      el.btnToggleReadonly.classList.add('hidden');
-      el.btnSetRoomPassword.classList.add('hidden');
-    }
-  }
-
-  function updateReadOnlyUI() {
-    if (state.isReadOnly) {
-      el.readonlyBanner.classList.remove('hidden');
-      el.readonlyBanner.classList.add('flex');
-      el.iconReadonly.textContent = '🔒';
-      el.labelReadonly.textContent = 'Unlock Editor';
-      if (state.monacoInstance) {
-        state.monacoInstance.updateOptions({ readOnly: !state.isHost });
-      }
-      el.editorTextarea.readOnly = !state.isHost;
-    } else {
-      el.readonlyBanner.classList.add('hidden');
-      el.readonlyBanner.classList.remove('flex');
-      el.iconReadonly.textContent = '🔓';
-      el.labelReadonly.textContent = 'Lock Editor';
-      if (state.monacoInstance) {
-        state.monacoInstance.updateOptions({ readOnly: false });
-      }
-      el.editorTextarea.readOnly = false;
-    }
-  }
-
-  function updateExecutionBadge() {
-    const executableLangs = ['javascript', 'typescript', 'html', 'css'];
-    if (executableLangs.includes(state.language)) {
-      el.badgeExecutionMode.textContent = '⚡ In-Browser Execution';
-      el.badgeExecutionMode.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 text-violet-300 border border-violet-500/20';
-    } else {
-      el.badgeExecutionMode.textContent = '📝 Syntax Mode';
-      el.badgeExecutionMode.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700';
-    }
-  }
-
-  function updateLanguageInMonaco(lang) {
-    if (state.monacoInstance) {
-      const model = state.monacoInstance.getModel();
-      monaco.editor.setModelLanguage(model, mapLanguageToMonaco(lang));
-    }
-  }
-
-  function onCodeChange(code) {
-    updateLineNumbers();
-    updateCodeStats();
-    sendWsMessage({
-      type: 'SYNC_DOC',
-      code: code
-    });
-  }
-
-  function updateLineNumbers() {
-    const text = el.editorTextarea.value;
-    const lineCount = text.split('\n').length;
-    let html = '';
-    for (let i = 1; i <= lineCount; i++) html += `<div>${i}</div>`;
-    el.editorLineNumbers.innerHTML = html;
-  }
-
-  function updateCodeStats() {
-    const code = getEditorCode();
-    const lines = code.split('\n').length;
-    el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
-  }
-
-  // --- Code Execution Engine ---
-  function runCurrentCode() {
-    const code = getEditorCode();
-    const lang = state.language;
-
-    switchSideTab('tab-console');
-    playSound('blip');
-
-    const timestamp = new Date().toLocaleTimeString();
-    el.consoleOutput.innerHTML += `<div class="text-zinc-500 text-[11px] mt-2 pt-2 border-t border-border-dim/40 flex items-center justify-between">
-      <span>▶ Execution started (${lang})</span>
-      <span>${timestamp}</span>
-    </div>`;
-
-    if (lang === 'javascript' || lang === 'typescript') {
-      executeJavaScript(code);
-    } else if (lang === 'html' || lang === 'css') {
-      renderWebPreview();
-      switchSideTab('tab-preview');
-      appendConsoleLog(`Web preview updated. Switched to Web Preview tab.`, 'success');
-    } else {
-      simulateLanguageExecution(code, lang);
-    }
-  }
-
-  function executeJavaScript(code) {
-    const startTime = performance.now();
-    const logs = [];
-
-    const origLog = console.log;
-    const origWarn = console.warn;
-    const origError = console.error;
-
-    console.log = (...args) => logs.push({ type: 'info', text: args.map(formatLogArg).join(' ') });
-    console.warn = (...args) => logs.push({ type: 'warn', text: args.map(formatLogArg).join(' ') });
-    console.error = (...args) => logs.push({ type: 'error', text: args.map(formatLogArg).join(' ') });
-
-    try {
-      const evalResult = new Function(code)();
-      const duration = (performance.now() - startTime).toFixed(1);
-
-      logs.forEach(l => appendConsoleLog(l.text, l.type));
-
-      if (evalResult !== undefined) {
-        appendConsoleLog(`← Return: ${formatLogArg(evalResult)}`, 'success');
-      }
-
-      appendConsoleLog(`Execution completed in ${duration}ms ✓`, 'success');
-      playSound('success');
-    } catch (err) {
-      appendConsoleLog(`Runtime Error: ${err.message}`, 'error');
-    } finally {
-      console.log = origLog;
-      console.warn = origWarn;
-      console.error = origError;
-      el.consoleOutput.scrollTop = el.consoleOutput.scrollHeight;
-    }
-  }
-
-  function simulateLanguageExecution(code, lang) {
-    setTimeout(() => {
-      appendConsoleLog(`Note: ${lang} is rendered in syntax highlighting mode.`, 'info');
-      appendConsoleLog(`Simulated parse check: Clean syntax [OK]`, 'success');
-      el.consoleOutput.scrollTop = el.consoleOutput.scrollHeight;
-    }, 150);
-  }
-
-  function renderWebPreview() {
-    let content = getEditorCode();
-    if (state.language === 'css') {
-      content = `<!DOCTYPE html><html><head><style>${content}</style></head><body><div class="developer-card"><h1>CodeShift CSS Preview</h1><p>Your styles rendered live.</p></div></body></html>`;
-    }
-    const blob = new Blob([content], { type: 'text/html' });
-    el.previewIframe.src = URL.createObjectURL(blob);
-  }
-
-  function formatLogArg(arg) {
-    if (arg === null) return 'null';
-    if (arg === undefined) return 'undefined';
-    if (typeof arg === 'object') {
-      try { return JSON.stringify(arg, null, 2); }
-      catch (e) { return Object.prototype.toString.call(arg); }
-    }
-    return String(arg);
-  }
-
-  function appendConsoleLog(message, type = 'info') {
-    const row = document.createElement('div');
-    row.className = `console-log-row console-log-${type} text-xs font-mono`;
-    row.textContent = message;
-    el.consoleOutput.appendChild(row);
-  }
-
-  // --- Snapshots & Visual Diff Engine ---
-  function promptSaveSnapshot() {
-    const title = prompt('Enter a checkpoint description:', `Shift Checkpoint`);
-    if (title) {
-      sendWsMessage({
-        type: 'CREATE_SNAPSHOT',
-        title: title
-      });
-      showToast('Saving snapshot to server... 📸', 'info');
-    }
-  }
-
-  function renderSnapshotsList() {
-    el.snapshotsList.innerHTML = '';
-    el.badgeSnapshotsCount.textContent = state.snapshots.length;
-
-    if (state.snapshots.length === 0) {
-      el.snapshotsList.innerHTML = '<div class="text-zinc-500 text-xs text-center py-4">No checkpoints saved yet.</div>';
-      return;
-    }
-
-    state.snapshots.forEach((snap) => {
-      const item = document.createElement('div');
-      item.className = 'p-2.5 rounded-xl bg-surface-elevated/70 border border-border-dim hover:border-violet-500/40 transition-all flex items-center justify-between gap-2';
-      item.innerHTML = `
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-white truncate">${snap.title}</span>
-            <span class="text-[10px] text-violet-400 font-mono">${snap.lines || 0}L</span>
-          </div>
-          <div class="text-[10px] text-zinc-500 font-mono mt-0.5">
-            ${snap.author || 'Dev'} • ${snap.time || ''}
-          </div>
-        </div>
-        <div class="flex items-center gap-1">
-          <button class="btn-view-diff px-2 py-1 rounded bg-surface hover:bg-violet-600 text-zinc-300 hover:text-white text-[11px] font-semibold transition-all" data-id="${snap.id}">Diff</button>
-          <button class="btn-restore-snap px-2 py-1 rounded bg-surface hover:bg-emerald-600 text-zinc-300 hover:text-white text-[11px] font-semibold transition-all" data-id="${snap.id}">Restore</button>
-        </div>
-      `;
-      el.snapshotsList.appendChild(item);
-    });
-
-    el.snapshotsList.querySelectorAll('.btn-view-diff').forEach(btn => {
-      btn.addEventListener('click', () => openDiffModal(btn.dataset.id));
-    });
-    el.snapshotsList.querySelectorAll('.btn-restore-snap').forEach(btn => {
-      btn.addEventListener('click', () => restoreSnapshot(btn.dataset.id));
-    });
-  }
-
-  let activeComparingSnapshot = null;
-  function openDiffModal(snapId) {
-    const snap = state.snapshots.find(s => s.id === snapId);
-    if (!snap) return;
-    activeComparingSnapshot = snap;
-
-    el.diffModalTitle.textContent = `Diff: "${snap.title}" vs Current Buffer`;
-    el.diffModalSubtitle.textContent = `Saved by ${snap.author} at ${snap.time}`;
-
-    const oldLines = (snap.code || '').split('\n');
-    const newLines = getEditorCode().split('\n');
-
-    el.diffViewer.innerHTML = '';
-    const maxLines = Math.max(oldLines.length, newLines.length);
-
-    for (let i = 0; i < maxLines; i++) {
-      const oldLine = oldLines[i];
-      const newLine = newLines[i];
-
-      if (oldLine === newLine) {
-        const line = document.createElement('div');
-        line.className = 'diff-line diff-eq';
-        line.textContent = `  ${oldLine || ''}`;
-        el.diffViewer.appendChild(line);
-      } else {
-        if (oldLine !== undefined) {
-          const del = document.createElement('div');
-          del.className = 'diff-line diff-del';
-          del.textContent = `- ${oldLine}`;
-          el.diffViewer.appendChild(del);
-        }
-        if (newLine !== undefined) {
-          const add = document.createElement('div');
-          add.className = 'diff-line diff-add';
-          add.textContent = `+ ${newLine}`;
-          el.diffViewer.appendChild(add);
-        }
-      }
-    }
-
-    el.modalDiff.classList.remove('hidden');
-    el.modalDiff.classList.add('flex');
-  }
-
-  function restoreSnapshot(snapId) {
-    const snap = state.snapshots.find(s => s.id === snapId);
-    if (!snap) return;
-    if (confirm(`Restore editor to "${snap.title}"?`)) {
-      setEditorCode(snap.code);
-      onCodeChange(snap.code);
-      showToast(`Restored version "${snap.title}"!`, 'success');
-      el.modalDiff.classList.add('hidden');
-      el.modalDiff.classList.remove('flex');
-    }
-  }
-
-  // --- Room Chat ---
-  function renderAllChatMessages() {
-    el.chatMessagesContainer.innerHTML = '';
-    state.chatMessages.forEach(m => {
-      appendChatMessage(m.userName, m.userColor, m.text, m.time, m.userId === state.userId);
-    });
-  }
-
-  function appendChatMessage(name, color, text, time, isSelf = false) {
-    const msg = document.createElement('div');
-    msg.className = `flex flex-col gap-1 p-2 rounded-xl text-xs max-w-[85%] ${
-      isSelf ? 'ml-auto bg-violet-600/20 border border-violet-500/30 text-white' : 'mr-auto bg-surface-elevated border border-border-dim text-zinc-200'
-    }`;
-    msg.innerHTML = `
-      <div class="flex items-center justify-between gap-2 text-[10px]">
-        <span class="font-bold" style="color: ${color}">${isSelf ? 'You' : name}</span>
-        <span class="text-zinc-500 font-mono">${time}</span>
-      </div>
-      <div class="text-xs break-words">${escapeHtml(text)}</div>
-    `;
-    el.chatMessagesContainer.appendChild(msg);
-    el.chatMessagesContainer.scrollTop = el.chatMessagesContainer.scrollHeight;
-  }
-
-  function sendChatMessage() {
-    const text = el.inputChatMessage.value.trim();
-    if (!text) return;
-
-    el.inputChatMessage.value = '';
-    sendWsMessage({
-      type: 'CHAT_MESSAGE',
-      text: text
-    });
-  }
-
-  function escapeHtml(str) {
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  // --- Password Modal ---
-  function openPasswordModal() {
-    el.modalPassword.classList.remove('hidden');
-    el.modalPassword.classList.add('flex');
-    el.passwordError.classList.add('hidden');
-    el.inputRoomPassword.value = '';
-    el.inputRoomPassword.focus();
-  }
-
-  el.btnSubmitPassword.addEventListener('click', () => {
-    const pw = el.inputRoomPassword.value;
-    sendWsMessage({
-      type: 'VERIFY_PASSWORD',
-      password: pw
-    });
-  });
-
-  el.inputRoomPassword.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') el.btnSubmitPassword.click();
-  });
-
-  el.btnCancelPassword.addEventListener('click', () => {
-    window.location.hash = '#/';
-  });
-
-  // --- Host Set Password ---
-  el.btnSetRoomPassword.addEventListener('click', () => {
-    el.modalSetPassword.classList.remove('hidden');
-    el.modalSetPassword.classList.add('flex');
-    el.inputNewRoomPassword.focus();
-  });
-
-  el.btnCancelSetPassword.addEventListener('click', () => {
-    el.modalSetPassword.classList.add('hidden');
-    el.modalSetPassword.classList.remove('flex');
-  });
-
-  el.btnSaveRoomPassword.addEventListener('click', () => {
-    const pw = el.inputNewRoomPassword.value;
-    sendWsMessage({
-      type: 'SET_PASSWORD',
-      password: pw
-    });
-    el.modalSetPassword.classList.add('hidden');
-    el.modalSetPassword.classList.remove('flex');
-  });
-
-  // --- Host Lock Editor ---
-  el.btnToggleReadonly.addEventListener('click', () => {
-    if (!state.isHost) return;
-    sendWsMessage({
-      type: 'TOGGLE_READ_ONLY',
-      isReadOnly: !state.isReadOnly
-    });
-  });
-
-  // --- Side Panel Tabs ---
-  function switchSideTab(targetId) {
-    state.activeSideTab = targetId;
-    el.sideTabs.forEach(tab => {
-      tab.classList.toggle('active', tab.dataset.tab === targetId);
-    });
-    el.tabPanes.forEach(pane => {
-      pane.classList.toggle('hidden', pane.id !== targetId);
-    });
-    if (targetId === 'tab-chat') {
-      el.badgeChatUnread.classList.add('hidden');
-    }
-  }
-
-  el.sideTabs.forEach(tab => {
-    tab.addEventListener('click', () => switchSideTab(tab.dataset.tab));
-  });
-
-  // --- Event Bindings ---
-  el.btnCreateOrJoin.addEventListener('click', () => {
-    const input = el.inputCustomRoom.value.trim();
-    navigateToRoom(input || generateRoomSlug());
-  });
-
-  el.inputCustomRoom.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') el.btnCreateOrJoin.click();
-  });
-
-  el.btnQuickSampleRoom.addEventListener('click', () => navigateToRoom('shift-demo'));
-  el.navBtnInstantRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
-  el.btnHeroLaunchRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
-
-  // Share Modal & Copy Link
-  function copyShareLink() {
+  // --- Share Link Helper ---
+  function openShareModal() {
     let url = window.location.href;
-    const customServer = (state.serverUrl || localStorage.getItem('codeshift_ws_server') || '').trim();
-    if (customServer && !url.includes('server=')) {
+    const fbUrl = state.firebaseUrl || localStorage.getItem('codeshare_firebase_url');
+    if (fbUrl && !url.includes('fb=')) {
       const sep = url.includes('?') ? '&' : '?';
-      url = `${url}${sep}server=${encodeURIComponent(customServer)}`;
+      url = `${url}${sep}fb=${encodeURIComponent(fbUrl)}`;
     }
+
     if (el.inputShareLink) el.inputShareLink.value = url;
     if (el.modalShare) {
       el.modalShare.classList.remove('hidden');
       el.modalShare.classList.add('flex');
       if (el.inputShareLink) el.inputShareLink.select();
     }
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
-        showToast('Room link copied to clipboard! 📋', 'success');
+        showToast('Room link copied! Share with collaborators 📋', 'success');
       }).catch(() => {});
     }
   }
 
-  el.btnCopyRoomLink.addEventListener('click', copyShareLink);
-  el.btnShareRoom.addEventListener('click', copyShareLink);
+  // --- Event Bindings ---
+  // 1. Share & Copy
+  if (el.btnShareRoom) el.btnShareRoom.addEventListener('click', openShareModal);
+  if (el.btnCopyRoomLink) el.btnCopyRoomLink.addEventListener('click', openShareModal);
 
   if (el.btnModalCopyLink) {
     el.btnModalCopyLink.addEventListener('click', () => {
       if (el.inputShareLink) {
         el.inputShareLink.select();
         navigator.clipboard.writeText(el.inputShareLink.value).then(() => {
-          showToast('Link copied! 📋', 'success');
+          showToast('Link copied to clipboard! 📋', 'success');
           el.btnModalCopyLink.textContent = 'Copied!';
           setTimeout(() => { if (el.btnModalCopyLink) el.btnModalCopyLink.textContent = 'Copy Link'; }, 2000);
         });
@@ -1438,327 +848,200 @@ ORDER BY active_collaborators DESC;`
 
   if (el.btnModalDoneShare) {
     el.btnModalDoneShare.addEventListener('click', () => {
-      if (el.modalShare) {
-        el.modalShare.classList.add('hidden');
-        el.modalShare.classList.remove('flex');
-      }
+      if (el.modalShare) el.modalShare.classList.add('hidden');
     });
   }
-
   if (el.btnCloseShare) {
     el.btnCloseShare.addEventListener('click', () => {
-      if (el.modalShare) {
-        el.modalShare.classList.add('hidden');
-        el.modalShare.classList.remove('flex');
+      if (el.modalShare) el.modalShare.classList.add('hidden');
+    });
+  }
+
+  // 2. New Room
+  if (el.btnHeroLaunchRoom) {
+    el.btnHeroLaunchRoom.addEventListener('click', () => {
+      navigateToRoom(generateRoomSlug());
+    });
+  }
+
+  // 3. Language Selector
+  if (el.selectLanguage) {
+    el.selectLanguage.addEventListener('change', (e) => {
+      const lang = e.target.value;
+      state.language = lang;
+      localStorage.setItem('codeshare_default_lang', lang);
+      updateLanguageInMonaco(lang);
+      onLocalCodeChange(getEditorCode());
+      showToast(`Language set to ${e.target.options[e.target.selectedIndex].text}`);
+    });
+  }
+
+  // 4. Cloud Sync / Firebase Modal
+  if (el.btnOpenCloudSync) {
+    el.btnOpenCloudSync.addEventListener('click', () => {
+      if (el.inputFirebaseUrl) {
+        el.inputFirebaseUrl.value = state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || '';
+      }
+      if (el.settingServerUrl) {
+        el.settingServerUrl.value = state.serverUrl || localStorage.getItem('codeshift_ws_server') || '';
+      }
+      if (el.modalCloudSync) {
+        el.modalCloudSync.classList.remove('hidden');
+        el.modalCloudSync.classList.add('flex');
       }
     });
   }
 
-  // Run & Format Buttons
-  el.btnRunCode.addEventListener('click', runCurrentCode);
-  el.btnClearConsole.addEventListener('click', () => {
-    el.consoleOutput.innerHTML = '<div class="text-zinc-500 italic">// Console cleared.</div>';
-  });
-  el.btnRefreshPreview.addEventListener('click', renderWebPreview);
-  el.btnTakeSnapshot.addEventListener('click', promptSaveSnapshot);
-  el.btnCreateSnapshotModal.addEventListener('click', promptSaveSnapshot);
-
-  // Format Code
-  el.btnFormatCode.addEventListener('click', () => {
-    if (state.monacoInstance) {
-      state.monacoInstance.getAction('editor.action.formatDocument').run();
-      showToast('Document formatted ✨', 'success');
-    } else {
-      showToast('Code cleaned ✨', 'success');
-    }
-  });
-
-  // Fullscreen Editor Toggle
-  el.btnToggleFullscreen.addEventListener('click', () => {
-    state.isFullscreen = !state.isFullscreen;
-    document.body.classList.toggle('is-fullscreen-editor', state.isFullscreen);
-    if (state.monacoInstance) {
-      setTimeout(() => state.monacoInstance.layout(), 50);
-    }
-  });
-
-  // Download Code
-  el.btnDownloadCode.addEventListener('click', () => {
-    const extMap = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', markdown: 'md', rust: 'rs', go: 'go', sql: 'sql' };
-    const ext = extMap[state.language] || 'txt';
-    const filename = `codeshift-${state.roomId}.${ext}`;
-    const blob = new Blob([getEditorCode()], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    showToast(`Downloaded ${filename}`, 'success');
-  });
-
-  // Language Change
-  el.selectLanguage.addEventListener('change', (e) => {
-    const lang = e.target.value;
-    state.language = lang;
-    updateLanguageInMonaco(lang);
-    updateExecutionBadge();
-
-    // Broadcast language change to room
-    sendWsMessage({
-      type: 'SET_LANGUAGE',
-      language: lang
-    });
-
-    showToast(`Language set to ${e.target.options[e.target.selectedIndex].text}`);
-  });
-
-  // Theme Change
-  el.selectTheme.addEventListener('change', (e) => {
-    const theme = e.target.value;
-    state.theme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('codeshift_theme', theme);
-  });
-  document.documentElement.setAttribute('data-theme', state.theme);
-  el.selectTheme.value = state.theme;
-
-  // Toggle Sidepanel
-  el.btnToggleSidepanel.addEventListener('click', () => {
-    el.sidePanel.classList.toggle('hidden');
-    if (state.monacoInstance) {
-      setTimeout(() => state.monacoInstance.layout(), 100);
-    }
-  });
-
-  // Chat Send
-  el.btnSendChat.addEventListener('click', sendChatMessage);
-  el.inputChatMessage.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
-  });
-
-  // Diff Modal Close & Restore
-  el.btnCloseDiffModal.addEventListener('click', () => {
-    el.modalDiff.classList.add('hidden');
-    el.modalDiff.classList.remove('flex');
-  });
-  el.btnCloseDiff.addEventListener('click', () => {
-    el.modalDiff.classList.add('hidden');
-    el.modalDiff.classList.remove('flex');
-  });
-  el.btnRestoreDiffSnapshot.addEventListener('click', () => {
-    if (activeComparingSnapshot) restoreSnapshot(activeComparingSnapshot.id);
-  });
-
-  // Nickname Modal
-  el.btnChangeNickname.addEventListener('click', () => {
-    el.inputNewNickname.value = state.userName;
-    el.modalNickname.classList.remove('hidden');
-    el.modalNickname.classList.add('flex');
-    el.inputNewNickname.focus();
-  });
-  el.btnCancelNickname.addEventListener('click', () => {
-    el.modalNickname.classList.add('hidden');
-    el.modalNickname.classList.remove('flex');
-  });
-  el.btnSaveNickname.addEventListener('click', () => {
-    const newName = el.inputNewNickname.value.trim();
-    if (newName) {
-      state.userName = newName;
-      localStorage.setItem('codeshift_user_name', newName);
-      el.userNicknameDisplay.textContent = newName;
-      el.modalNickname.classList.add('hidden');
-      el.modalNickname.classList.remove('flex');
-      renderPeers();
-      showToast(`Display name set to "${newName}"`, 'success');
-    }
-  });
-
-  // Codeshare Drawer Management
-  function closeAllDrawers() {
-    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
-    if (el.drawerChat) el.drawerChat.classList.add('closed');
-    if (el.drawerConsole) el.drawerConsole.classList.add('closed');
-  }
-
-  function toggleDrawer(drawerEl) {
-    if (!drawerEl) return;
-    const isClosed = drawerEl.classList.contains('closed');
-    closeAllDrawers();
-    if (isClosed) {
-      drawerEl.classList.remove('closed');
-    }
-  }
-
-  // Settings Drawer
-  el.btnOpenSettings.addEventListener('click', () => {
-    el.settingFontsize.value = state.settings.fontSize;
-    el.settingTabsize.value = state.settings.tabSize;
-    el.settingWordwrap.checked = state.settings.wordWrap;
-    el.settingSound.checked = state.settings.sound;
-    if (el.settingServerUrl) {
-      el.settingServerUrl.value = state.serverUrl || localStorage.getItem('codeshift_ws_server') || '';
-    }
-    toggleDrawer(el.drawerSettings);
-  });
-  if (el.btnCloseDrawerSettings) {
-    el.btnCloseDrawerSettings.addEventListener('click', () => {
-      if (el.drawerSettings) el.drawerSettings.classList.add('closed');
-    });
-  }
-  el.btnCloseSettings.addEventListener('click', () => {
-    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
-  });
-  el.btnSaveSettings.addEventListener('click', () => {
-    state.settings.fontSize = parseInt(el.settingFontsize.value, 10);
-    state.settings.tabSize = parseInt(el.settingTabsize.value, 10);
-    state.settings.wordWrap = el.settingWordwrap.checked;
-    state.settings.sound = el.settingSound.checked;
-
-    localStorage.setItem('cs_fontSize', state.settings.fontSize);
-    localStorage.setItem('cs_tabSize', state.settings.tabSize);
-    localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
-    localStorage.setItem('cs_sound', state.settings.sound);
-
-    // Save server URL preference
-    const oldServer = state.serverUrl;
-    const newServer = el.settingServerUrl ? el.settingServerUrl.value.trim() : '';
-    state.serverUrl = newServer;
-    if (newServer) {
-      localStorage.setItem('codeshift_ws_server', newServer);
-    } else {
-      localStorage.removeItem('codeshift_ws_server');
-    }
-
-    if (state.monacoInstance) {
-      state.monacoInstance.updateOptions({
-        fontSize: state.settings.fontSize,
-        tabSize: state.settings.tabSize,
-        wordWrap: state.settings.wordWrap ? 'on' : 'off'
-      });
-    }
-
-    // Reconnect WebSocket if server changed while in an active room
-    if (newServer !== oldServer && state.roomId) {
-      showToast('Reconnecting to updated server...', 'info');
-      connectWebSocket(state.roomId);
-    }
-
-    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
-    showToast('Preferences updated!', 'success');
-  });
-
-  // Chat & Console Drawer Toggles
-  if (el.btnToggleChat) {
-    el.btnToggleChat.addEventListener('click', () => {
-      toggleDrawer(el.drawerChat);
-      if (el.badgeChatUnread) el.badgeChatUnread.classList.add('hidden');
-    });
-  }
-  if (el.btnCloseDrawerChat) {
-    el.btnCloseDrawerChat.addEventListener('click', () => {
-      if (el.drawerChat) el.drawerChat.classList.add('closed');
+  if (el.btnCloseCloudSync) {
+    el.btnCloseCloudSync.addEventListener('click', () => {
+      if (el.modalCloudSync) el.modalCloudSync.classList.add('hidden');
     });
   }
 
-  if (el.btnToggleConsole) {
-    el.btnToggleConsole.addEventListener('click', () => {
-      toggleDrawer(el.drawerConsole);
-    });
-  }
-  if (el.btnCloseDrawerConsole) {
-    el.btnCloseDrawerConsole.addEventListener('click', () => {
-      if (el.drawerConsole) el.drawerConsole.classList.add('closed');
-    });
-  }
+  if (el.btnSaveCloudSync) {
+    el.btnSaveCloudSync.addEventListener('click', () => {
+      const fbUrl = el.inputFirebaseUrl ? el.inputFirebaseUrl.value.trim() : '';
+      const sUrl = el.settingServerUrl ? el.settingServerUrl.value.trim() : '';
 
-  // Console vs Web Preview Tab Toggles inside drawer
-  if (el.tabBtnConsole && el.tabBtnPreview) {
-    el.tabBtnConsole.addEventListener('click', () => {
-      el.tabBtnConsole.style.color = '#ffffff';
-      el.tabBtnConsole.style.borderBottom = '2px solid var(--cs-coral)';
-      el.tabBtnPreview.style.color = '#9aa2b1';
-      el.tabBtnPreview.style.borderBottom = 'none';
-      if (el.consoleOutput) el.consoleOutput.classList.remove('hidden');
-      if (el.previewIframe) el.previewIframe.classList.add('hidden');
-      if (el.btnClearConsole) el.btnClearConsole.style.display = 'inline-block';
-      if (el.btnRefreshPreview) el.btnRefreshPreview.style.display = 'none';
-    });
-    el.tabBtnPreview.addEventListener('click', () => {
-      el.tabBtnPreview.style.color = '#ffffff';
-      el.tabBtnPreview.style.borderBottom = '2px solid var(--cs-coral)';
-      el.tabBtnConsole.style.color = '#9aa2b1';
-      el.tabBtnConsole.style.borderBottom = 'none';
-      if (el.previewIframe) el.previewIframe.classList.remove('hidden');
-      if (el.consoleOutput) el.consoleOutput.classList.add('hidden');
-      if (el.btnClearConsole) el.btnClearConsole.style.display = 'none';
-      if (el.btnRefreshPreview) el.btnRefreshPreview.style.display = 'inline-block';
-      renderWebPreview();
+      state.firebaseUrl = fbUrl;
+      if (fbUrl) localStorage.setItem('codeshare_firebase_url', fbUrl);
+      else localStorage.removeItem('codeshare_firebase_url');
+
+      state.serverUrl = sUrl;
+      if (sUrl) localStorage.setItem('codeshift_ws_server', sUrl);
+      else localStorage.removeItem('codeshift_ws_server');
+
+      if (state.roomId) {
+        initFirebaseSync(state.roomId);
+        connectWebSocket(state.roomId);
+      }
+
+      if (el.modalCloudSync) el.modalCloudSync.classList.add('hidden');
+      showToast('Cloud database configuration saved!', 'success');
     });
   }
 
-  // Cancel secondary buttons in modals
-  const cancelNick2 = document.getElementById('btn-cancel-nickname-2');
-  if (cancelNick2) cancelNick2.addEventListener('click', () => el.btnCancelNickname.click());
-
-  const cancelSetPass2 = document.getElementById('btn-cancel-set-password-2');
-  if (cancelSetPass2) cancelSetPass2.addEventListener('click', () => el.btnCancelSetPassword.click());
-
-  const cancelPass2 = document.getElementById('btn-cancel-password-2');
-  if (cancelPass2) cancelPass2.addEventListener('click', () => el.btnCancelPassword.click());
-
-  // Landing page launch buttons
-  document.querySelectorAll('.btn-launch-trigger').forEach(btn => {
-    btn.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
-  });
-
-  // Test Server Ping Button
   if (el.btnTestServerPing) {
     el.btnTestServerPing.addEventListener('click', async () => {
-      const val = (el.settingServerUrl.value || '').trim();
-      if (!val) {
-        showToast('Please enter a server URL to ping', 'error');
+      const fbUrl = (el.inputFirebaseUrl.value || '').trim();
+      if (!fbUrl) {
+        showToast('Please enter a Firebase Database URL to test', 'error');
         return;
-      }
-      let httpUrl = val.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://').replace(/\/$/, '');
-      if (!httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
-        httpUrl = (location.protocol === 'https:' ? 'https://' : 'http://') + httpUrl;
       }
       try {
         el.btnTestServerPing.textContent = 'Testing...';
-        const res = await fetch(`${httpUrl}/api/health`, { method: 'GET' });
-        if (res.ok) {
-          const data = await res.json();
-          showToast(`Backend online (${data.provider || 'active'}) ⚡`, 'success');
+        const testRes = await fetch(`${fbUrl.replace(/\/$/, '')}/.json?shallow=true`, { method: 'GET' });
+        if (testRes.ok) {
+          showToast('Firebase Realtime Database reachable! ⚡', 'success');
         } else {
-          showToast(`Server responded with HTTP ${res.status}`, 'error');
+          showToast(`Firebase test responded with HTTP ${testRes.status}`, 'error');
         }
       } catch (e) {
-        showToast('Could not reach server: ' + e.message, 'error');
+        showToast('Connection failed: ' + e.message, 'error');
       } finally {
-        el.btnTestServerPing.textContent = 'Test Ping';
+        el.btnTestServerPing.textContent = 'Test Connection';
       }
     });
   }
 
-  // Global connection pill click triggers settings
-  if (el.globalConnectionPill) {
-    el.globalConnectionPill.style.cursor = 'pointer';
-    el.globalConnectionPill.title = 'Click to configure WebSocket backend relay';
-    el.globalConnectionPill.addEventListener('click', () => {
-      el.btnOpenSettings.click();
+  // 5. Settings / Preferences
+  if (el.btnOpenSettings) {
+    el.btnOpenSettings.addEventListener('click', () => {
+      if (el.settingFontsize) el.settingFontsize.value = state.settings.fontSize;
+      if (el.settingTabsize) el.settingTabsize.value = state.settings.tabSize;
+      if (el.settingWordwrap) el.settingWordwrap.checked = state.settings.wordWrap;
+      if (el.settingSound) el.settingSound.checked = state.settings.sound;
+      if (el.modalSettings) {
+        el.modalSettings.classList.remove('hidden');
+        el.modalSettings.classList.add('flex');
+      }
     });
   }
 
-  // Banner Actions
-  if (el.btnBannerConfigServer) {
-    el.btnBannerConfigServer.addEventListener('click', () => {
-      el.btnOpenSettings.click();
+  if (el.btnCloseSettings) {
+    el.btnCloseSettings.addEventListener('click', () => {
+      if (el.modalSettings) el.modalSettings.classList.add('hidden');
     });
   }
-  if (el.btnBannerDismiss) {
-    el.btnBannerDismiss.addEventListener('click', () => {
-      if (el.connectionNoticeBanner) {
-        el.connectionNoticeBanner.classList.add('hidden');
-        el.connectionNoticeBanner.classList.remove('flex');
+
+  if (el.btnSaveSettings) {
+    el.btnSaveSettings.addEventListener('click', () => {
+      state.settings.fontSize = parseInt(el.settingFontsize.value, 10);
+      state.settings.tabSize = parseInt(el.settingTabsize.value, 10);
+      state.settings.wordWrap = el.settingWordwrap.checked;
+      state.settings.sound = el.settingSound.checked;
+
+      localStorage.setItem('cs_fontSize', state.settings.fontSize);
+      localStorage.setItem('cs_tabSize', state.settings.tabSize);
+      localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
+      localStorage.setItem('cs_sound', state.settings.sound);
+
+      if (state.monacoInstance) {
+        state.monacoInstance.updateOptions({
+          fontSize: state.settings.fontSize,
+          tabSize: state.settings.tabSize,
+          wordWrap: state.settings.wordWrap ? 'on' : 'off'
+        });
+      }
+
+      if (el.modalSettings) el.modalSettings.classList.add('hidden');
+      showToast('Settings saved!', 'success');
+    });
+  }
+
+  // 6. Nickname Modal
+  if (el.btnChangeNickname) {
+    el.btnChangeNickname.addEventListener('click', () => {
+      if (el.inputNewNickname) el.inputNewNickname.value = state.userName;
+      if (el.modalNickname) {
+        el.modalNickname.classList.remove('hidden');
+        el.modalNickname.classList.add('flex');
+        if (el.inputNewNickname) el.inputNewNickname.focus();
+      }
+    });
+  }
+
+  if (el.btnCancelNickname) {
+    el.btnCancelNickname.addEventListener('click', () => {
+      if (el.modalNickname) el.modalNickname.classList.add('hidden');
+    });
+  }
+
+  if (el.btnSaveNickname) {
+    el.btnSaveNickname.addEventListener('click', () => {
+      const newName = (el.inputNewNickname.value || '').trim();
+      if (newName) {
+        state.userName = newName;
+        localStorage.setItem('codeshare_user_name', newName);
+        if (el.userNicknameDisplay) el.userNicknameDisplay.textContent = `(${newName})`;
+        if (el.modalNickname) el.modalNickname.classList.add('hidden');
+        showToast(`Display name set to "${newName}"`, 'success');
+      }
+    });
+  }
+
+  // 7. Download Code
+  if (el.btnDownloadCode) {
+    el.btnDownloadCode.addEventListener('click', () => {
+      const extMap = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', markdown: 'md', rust: 'rs', go: 'go', sql: 'sql' };
+      const ext = extMap[state.language] || 'txt';
+      const filename = `codeshare-${state.roomId || 'code'}.${ext}`;
+      const blob = new Blob([getEditorCode()], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      showToast(`Downloaded ${filename}`, 'success');
+    });
+  }
+
+  // 8. Fullscreen Toggle
+  if (el.btnToggleFullscreen) {
+    el.btnToggleFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
       }
     });
   }
