@@ -23,7 +23,7 @@
   <rect width="1200" height="630" fill="url(#bg)"/>
 
   <!-- Living 3D Wave Grid Simulation -->
-  <g opacity="0.35" stroke="#7ce2ee" stroke-width="1" fill="none">
+  <g opacity="0.30" stroke="#ffffff" stroke-width="0.8" fill="none">
     <path d="M0,380 Q300,320 600,360 T1200,330"/>
     <path d="M0,400 Q300,340 600,380 T1200,350"/>
     <path d="M0,420 Q300,360 600,400 T1200,370"/>
@@ -36,8 +36,8 @@
     <path d="M0,560 Q300,535 600,575 T1200,545"/>
   </g>
 
-  <!-- Ambient Moon Glow Backdrop -->
-  <circle cx="600" cy="180" r="140" fill="#7ce2ee" opacity="0.08" filter="url(#glow)"/>
+  <!-- Ambient Backdrop Glow -->
+  <circle cx="600" cy="180" r="140" fill="#ffffff" opacity="0.04" filter="url(#glow)"/>
 
   <!-- Top Navigation Simulation -->
   <g transform="translate(60, 36)">
@@ -51,16 +51,16 @@
 
   <!-- Tagline Pill -->
   <g transform="translate(600, 115)">
-    <rect x="-160" y="-14" width="320" height="28" rx="14" fill="#0c232d" stroke="#7ce2ee" stroke-opacity="0.3"/>
-    <circle cx="-135" cy="0" r="4" fill="#4ecdc4"/>
-    <text x="-120" y="4" font-family="-apple-system, sans-serif" font-size="11.5" font-weight="600" fill="#7ce2ee">REAL-TIME CODE SHARING · NO LOGIN</text>
+    <rect x="-160" y="-14" width="320" height="28" rx="14" fill="#111111" stroke="#333333" stroke-width="1"/>
+    <circle cx="-135" cy="0" r="4" fill="#ffffff"/>
+    <text x="-120" y="4" font-family="-apple-system, sans-serif" font-size="11" font-weight="700" fill="#ffffff">REAL-TIME CODE SHARING · NO LOGIN</text>
   </g>
 
   <!-- Headline -->
   <text x="600" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="46" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="-1">
     Code Together.
   </text>
-  <text x="600" y="228" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="46" font-weight="800" fill="url(#tealGrad)" text-anchor="middle" letter-spacing="-1">
+  <text x="600" y="228" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="46" font-weight="800" fill="#888888" text-anchor="middle" letter-spacing="-1">
     Anywhere. Instantly.
   </text>
 

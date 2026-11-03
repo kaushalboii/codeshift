@@ -934,17 +934,17 @@
       mouseState.prevX = mouseState.x;
       mouseState.prevY = mouseState.y;
 
-      // ── BACKGROUND (Deep dark petrol-black void matching Image 3) ──
+      // ── BACKGROUND (Deep Obsidian Pitch-Black Void — Minimalist B&W) ──
       const isMobile = W < 768;
       const bg = ctx.createLinearGradient(0, 0, 0, H);
-      bg.addColorStop(0,    '#010d10');
-      bg.addColorStop(0.35, '#021518');
-      bg.addColorStop(0.70, '#021b1f');
-      bg.addColorStop(1,    '#010c0f');
+      bg.addColorStop(0,    '#000000');
+      bg.addColorStop(0.35, '#040404');
+      bg.addColorStop(0.70, '#080808');
+      bg.addColorStop(1,    '#000000');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // ── FULL-PAGE 3D GLOWING TEAL PARTICLE WAVE PLATFORM (IMAGE 3) ──
+      // ── FULL-PAGE 3D MONOCHROME PARTICLE WAVE MATRIX (BLACK & WHITE THEME) ──
       // Spans the entire screen with flowing 3D perspective sine waves and live air-breather physics
       const COLS = isMobile ? 48 : 72;
       const ROWS = isMobile ? 38 : 54;
@@ -995,8 +995,8 @@
           rowPoints.push({ screenX, screenY, crest, normR, depthFade });
         }
 
-        // Draw fine flowing ribbon contour line connecting points in this row
-        ctx.strokeStyle = `rgba(0, 220, 210, ${0.05 + depthFade * 0.18})`;
+        // Draw fine flowing ribbon contour line in crisp silver monochrome
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.03 + depthFade * 0.14})`;
         ctx.lineWidth = 0.8;
         ctx.beginPath();
         for (let i = 0; i < rowPoints.length; i++) {
@@ -1006,22 +1006,21 @@
         }
         ctx.stroke();
 
-        // Draw glowing dots on top of the ribbon (Image 3 luminous dots)
+        // Draw glowing monochrome dots on top of the ribbon (pure white crests, titanium troughs)
         for (let i = 0; i < rowPoints.length; i++) {
           const pt = rowPoints[i];
           const dotRadius = Math.max(0.65, (0.95 + pt.crest * 1.85) * (0.42 + pt.depthFade * 0.88));
           const alpha = Math.min(1, (0.16 + pt.crest * 0.80) * (0.30 + pt.depthFade * 0.70));
 
-          if (pt.crest > 0.62) {
-            // Electric glowing cyan ridge (Image 3 signature crest highlight)
-            ctx.fillStyle = `rgba(20, 255, 242, ${alpha})`;
-            ctx.shadowColor = 'rgba(0, 240, 225, 0.85)';
+          if (pt.crest > 0.60) {
+            // Luminous glowing pure white crest highlight
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
             ctx.shadowBlur = Math.round(7 * pt.depthFade);
           } else {
-            // Deep oceanic teal trough
-            const gVal = Math.round(120 + pt.crest * 110);
-            const bVal = Math.round(145 + pt.crest * 100);
-            ctx.fillStyle = `rgba(8, ${gVal}, ${bVal}, ${alpha * 0.82})`;
+            // Silvery titanium monochrome trough
+            const grey = Math.round(100 + pt.crest * 110);
+            ctx.fillStyle = `rgba(${grey}, ${grey}, ${grey}, ${alpha * 0.82})`;
             ctx.shadowBlur = 0;
           }
 
