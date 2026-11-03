@@ -3,19 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeShare — Instant Real-Time Code Sharing</title>
-  <meta name="description" content="Simple, instant real-time code sharing with auto-save and seamless multi-device sync without login.">
+  <title>CodeShift — Real-Time Collaborative Code Editor</title>
+  <meta name="description" content="Instant real-time code sharing with auto-save and seamless multi-device sync without login.">
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
+
+  <!-- GitHub Pages SPA Path Restorer: Removes # and restores clean path -->
+  <script>
+    (function() {
+      var savedRoom = sessionStorage.getItem('codeshift_room');
+      if (savedRoom) {
+        sessionStorage.removeItem('codeshift_room');
+        var repoPrefix = window.location.pathname.startsWith('/codeshift') ? '/codeshift' : '';
+        window.history.replaceState(null, null, repoPrefix + '/' + encodeURIComponent(savedRoom));
+      }
+    })();
+  </script>
 
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Monaco Editor Loader (VS Code Engine) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 
-  <!-- Firebase Realtime Database (Client SDK for silent background cloud sync) -->
+  <!-- Firebase Realtime Database (Client SDK) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -40,16 +52,20 @@
     <header class="app-header">
       
       <div class="header-left">
-        <!-- Logo -->
-        <a href="#/new" class="brand-logo" id="brand-logo" title="New CodeShare Room">
-          <span class="brand-logo-icon">&gt;&lt;</span>
-          <span>CodeShare</span>
+        <!-- CodeShift Brand Logo -->
+        <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="New CodeShift Room">
+          <svg class="brand-logo-icon" viewBox="0 0 36 36" width="24" height="24" fill="none">
+            <path d="M10 9L4 18L10 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M26 9L32 18L26 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#C084FC"/>
+          </svg>
+          <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
         </a>
 
         <!-- Room Link Badge (Click to copy or change) -->
-        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy or switch room">
+        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link or switch room">
           <span>🔗</span>
-          <span id="room-nav-id">/kaushal</span>
+          <span id="room-nav-id">/room</span>
         </div>
 
         <!-- Auto-Save Status Pill -->
@@ -59,43 +75,27 @@
         </div>
       </div>
 
-      <!-- Center Controls: Language & Active Users -->
+      <!-- Center Controls: Active Users Online Counter -->
       <div class="header-center">
-        
-        <!-- Language Syntax Selector -->
-        <select id="select-language" class="language-dropdown-select" title="Change syntax mode">
-          <option value="javascript">JavaScript</option>
-          <option value="typescript">TypeScript</option>
-          <option value="python">Python</option>
-          <option value="html">HTML / CSS</option>
-          <option value="css">CSS</option>
-          <option value="json">JSON</option>
-          <option value="sql">SQL</option>
-          <option value="rust">Rust</option>
-          <option value="go">Go</option>
-          <option value="markdown">Markdown</option>
-          <option value="plaintext">Plain Text</option>
-        </select>
-
-        <!-- Active Users Online Counter -->
-        <div class="online-users-badge" id="btn-change-nickname" title="Click to change your display name" style="cursor: pointer;">
-          <span id="user-role-badge">👤</span>
+        <!-- Live Online Users Counter -->
+        <div class="online-users-badge" id="online-users-badge" title="Active users in this room">
+          <span class="presence-pulse"></span>
+          <span id="user-role-badge">👥</span>
           <span id="online-users-count">1 online</span>
         </div>
-
       </div>
 
       <!-- Right Action Controls -->
       <div class="header-right">
         
         <!-- Copy Share Link Button (Primary) -->
-        <button id="btn-share-room" class="btn-coral-share" title="Copy room link to clipboard">
+        <button id="btn-share-room" class="btn-coral-share" title="Copy clean room link">
           <span>📋</span>
           <span>Copy Link</span>
         </button>
 
         <!-- New Clean Room -->
-        <button id="btn-hero-launch-room" class="btn-subtle-action" title="Create a new clean code room">
+        <button id="btn-create-new-room" class="btn-subtle-action" title="Create a new clean code room">
           <span>➕</span>
           <span>New</span>
         </button>
@@ -211,24 +211,12 @@
     </div>
   </div>
 
-  <!-- 3. Nickname Modal -->
-  <div id="modal-nickname" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">Change Display Name</h3>
-        <button id="btn-cancel-nickname" class="modal-close-btn">✕</button>
-      </div>
-      <div class="modal-content">
-        <p class="modal-description">Your name will appear as a live cursor flag to collaborators in this room.</p>
-        <input type="text" id="input-new-nickname" class="form-input" placeholder="e.g. Kaushal" maxlength="20">
-      </div>
-      <div class="modal-footer">
-        <button id="btn-save-nickname" class="btn-primary">Save Name</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Hidden compatibility elements to maintain complete JS runtime compatibility -->
+  <div id="modal-nickname" class="hidden"></div>
+  <input type="hidden" id="input-new-nickname" value="Anonymous">
+  <button id="btn-save-nickname" class="hidden"></button>
+  <button id="btn-cancel-nickname" class="hidden"></button>
+  <select id="select-language" class="hidden"><option value="plaintext">Plain</option></select>
   <div id="view-landing" class="hidden"></div>
   <div id="view-room" class="hidden"></div>
   <footer id="app-footer" class="hidden"></footer>

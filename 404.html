@@ -2,27 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Connecting to CodeShare...</title>
+  <title>CodeShift</title>
   <script>
     (function() {
       var path = window.location.pathname;
       var repoSegment = '/codeshift';
       var route = path;
-      if (route.startsWith(repoSegment)) {
-        route = route.slice(repoSegment.length);
+      if (route.indexOf(repoSegment) === 0) {
+        route = route.substring(repoSegment.length);
       }
       route = route.replace(/^\/+/, '');
-      var search = window.location.search || '';
-      var hash = window.location.hash || '';
-      if (!hash && route) {
-        window.location.replace(window.location.origin + repoSegment + '/#/' + route + search);
-      } else {
-        window.location.replace(window.location.origin + repoSegment + '/' + (hash ? hash : '#/new') + search);
+      
+      if (route && route !== 'index.html' && route !== '404.html') {
+        sessionStorage.setItem('codeshift_room', route);
       }
+      
+      window.location.replace(window.location.origin + repoSegment + '/');
     })();
   </script>
 </head>
-<body style="background:#0d0f15;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-  <p style="color:#94a3b8;font-size:14px;">Connecting to CodeShare room...</p>
+<body style="background:#0d0f15;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <p style="font-size:14px;letter-spacing:0.04em;">Connecting to CodeShift...</p>
 </body>
 </html>
