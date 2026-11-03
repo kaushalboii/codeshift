@@ -1,0 +1,19 @@
+name = "codeshift-backend"
+main = "worker/index.js"
+compatibility_date = "2024-04-01"
+
+# Durable Objects for Real-Time Rooms & WebSockets
+[durable_objects]
+bindings = [
+  { name = "CODESHIFT_ROOM", class_name = "CodeShiftRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["CodeShiftRoom"]
+
+# Optional Cloudflare D1 Database binding for room directory & analytics
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "codeshift-db"
+# database_id = "your-d1-database-id"

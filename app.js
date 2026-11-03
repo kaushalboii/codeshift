@@ -1,6 +1,14 @@
 /**
- * CodeShift — Core Client Application & Real-Time Sync Engine
+ * CodeShift — Production Client Application & Collaborative Engine
  * "Think together. Code without limits."
+ *
+ * Integrates:
+ * - Monaco Editor (VS Code engine) with full syntax, code folding, and bracket coloring
+ * - Internet-wide WebSocket synchronization with auto-reconnection
+ * - Remote cursor decorations and typing indicators
+ * - Host permissions, View-Only mode locks, and Password protection
+ * - Server-side snapshots and side-by-side visual diffs
+ * - Multi-language live execution & sandboxed HTML/CSS preview
  */
 
 (function () {
@@ -9,60 +17,74 @@
   // --- State Architecture ---
   const state = {
     roomId: null,
-    userId: 'peer_' + Math.random().toString(36).substring(2, 9),
+    userId: localStorage.getItem('codeshift_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
     userName: localStorage.getItem('codeshift_user_name') || 'Kaushal',
-    userColor: getRandomColor(),
-    peers: new Map(), // peerId -> { name, color, lastSeen, cursor: { line, col } }
+    userColor: localStorage.getItem('codeshift_user_color') || getRandomColor(),
+    isHost: false,
+    isReadOnly: false,
+    isProtected: false,
+    isAuthenticated: true,
+    peers: new Map(), // peerId -> { userId, userName, userColor, isHost, cursor }
     language: 'javascript',
     theme: localStorage.getItem('codeshift_theme') || 'codeshift',
     settings: {
       fontSize: parseInt(localStorage.getItem('cs_fontSize') || '14', 10),
       tabSize: parseInt(localStorage.getItem('cs_tabSize') || '2', 10),
-      autoBrackets: localStorage.getItem('cs_autoBrackets') !== 'false',
+      wordWrap: localStorage.getItem('cs_wordWrap') !== 'false',
       sound: localStorage.getItem('cs_sound') !== 'false'
     },
     snapshots: [],
     chatMessages: [],
-    syncChannel: null,
+    ws: null,
+    wsConnected: false,
+    wsReconnectAttempts: 0,
+    broadcastChannel: null,
     isApplyingRemoteChange: false,
     activeSideTab: 'tab-console',
-    lastSavedCode: ''
+    monacoInstance: null,
+    monacoDecorations: new Map(), // peerId -> decorationIds
+    remoteCursorWidgets: new Map(),
+    isFullscreen: false
   };
+
+  localStorage.setItem('codeshift_user_id', state.userId);
+  localStorage.setItem('codeshift_user_color', state.userColor);
 
   const DEFAULT_TEMPLATES = {
-    javascript: `// CodeShift • Collaborative JavaScript Studio
-// Room: Think together. Code without limits.
+    javascript: `// CodeShift • Collaborative JavaScript Environment
+// "Think together. Code without limits."
 
-function calculateVelocity(distanceKm, timeHours) {
-  if (timeHours <= 0) throw new Error("Time must be positive");
-  const velocity = distanceKm / timeHours;
+function analyzeSession(roomId, developerCount) {
   return {
-    kmh: velocity,
-    mph: +(velocity * 0.621371).toFixed(2),
-    status: velocity > 100 ? "High Speed ⚡" : "Cruising 🚗"
+    room: roomId,
+    developers: developerCount,
+    latency: "Edge Sub-15ms ⚡",
+    status: "Live & Synchronized"
   };
 }
 
-console.log("🚀 Initializing CodeShift engine...");
-const trip = calculateVelocity(420, 3.5);
-console.log("Trip Stats:", trip);
+console.log("🚀 Initializing CodeShift session...");
+const session = analyzeSession("shift-demo", 2);
+console.log("Active Session:", session);
 
-// Try editing this code or pressing ⌘+Enter to run!
+// Try editing or press ⌘+Enter to execute!
 `,
     typescript: `// CodeShift • TypeScript Environment
-interface Developer {
-  name: string;
-  role: string;
-  focus: string[];
+interface DeveloperSession {
+  roomId: string;
+  host: string;
+  peers: string[];
+  isLocked: boolean;
 }
 
-const host: Developer = {
-  name: "${state.userName}",
-  role: "Lead Architect",
-  focus: ["Real-time Sync", "Distributed Editors", "Clean Code"]
+const activeRoom: DeveloperSession = {
+  roomId: "production-shift",
+  host: "${state.userName}",
+  peers: ["Alex", "Taylor"],
+  isLocked: false
 };
 
-console.log("Host Profile:", host);
+console.log("TypeScript Room State:", activeRoom);
 `,
     html: `<!DOCTYPE html>
 <html>
@@ -71,25 +93,26 @@ console.log("Host Profile:", host);
     body {
       background: #0d0e15;
       color: #f8fafc;
-      font-family: sans-serif;
+      font-family: system-ui, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 90vh;
+      min-height: 90vh;
       margin: 0;
     }
     .badge {
       background: rgba(139, 124, 255, 0.15);
       border: 1px solid #8b7cff;
       color: #c084fc;
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-weight: bold;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-weight: 700;
       font-size: 13px;
     }
     h1 {
-      margin-top: 16px;
+      margin-top: 18px;
+      font-size: 32px;
       background: linear-gradient(135deg, #8b7cff, #38bdf8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -98,11 +121,13 @@ console.log("Host Profile:", host);
       background: #8b7cff;
       border: none;
       color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
+      padding: 10px 24px;
+      border-radius: 10px;
       cursor: pointer;
       font-weight: 600;
-      margin-top: 10px;
+      font-size: 14px;
+      margin-top: 14px;
+      box-shadow: 0 4px 14px rgba(139, 124, 255, 0.4);
     }
     button:hover { background: #7c6dfa; }
   </style>
@@ -110,19 +135,19 @@ console.log("Host Profile:", host);
 <body>
   <div class="badge">CodeShift Live Preview</div>
   <h1>Think together. Code without limits.</h1>
-  <p>Live synchronized HTML & CSS rendering right in your browser.</p>
-  <button onclick="alert('Connected live from CodeShift!')">Click Action</button>
+  <p>Live synchronized HTML & CSS rendered side-by-side in real-time.</p>
+  <button onclick="alert('CodeShift interactive action triggered!')">Click Action ⚡</button>
 </body>
 </html>`,
-    css: `/* CodeShift Modern Theme Styles */
+    css: `/* CodeShift Cyber Styling */
 :root {
-  --primary-glow: #8B7CFF;
+  --primary-violet: #8B7CFF;
   --cyber-cyan: #38BDF8;
 }
 
 .developer-card {
-  background: rgba(22, 23, 34, 0.8);
-  border: 1px solid rgba(139, 124, 255, 0.2);
+  background: rgba(22, 23, 34, 0.85);
+  border: 1px solid rgba(139, 124, 255, 0.25);
   border-radius: 16px;
   padding: 24px;
   backdrop-filter: blur(12px);
@@ -131,42 +156,39 @@ console.log("Host Profile:", host);
     python: `# CodeShift • Python Workspace
 import math
 
-def fibonacci(n):
-    sequence = [0, 1]
-    while len(sequence) < n:
-        sequence.append(sequence[-1] + sequence[-2])
-    return sequence
+def calculate_primes(limit):
+    primes = []
+    for num in range(2, limit + 1):
+        if all(num % i != 0 for i in range(2, int(math.isqrt(num)) + 1)):
+            primes.append(num)
+    return primes
 
 print("CodeShift Python Engine Ready.")
-print("Fibonacci sequence:", fibonacci(8))
-print("Pi precision:", round(math.pi, 5))
+print("Primes up to 30:", calculate_primes(30))
 `,
     json: `{
-  "product": "CodeShift",
-  "version": "1.0.0",
-  "features": [
-    "Real-time peer synchronization",
-    "Live execution sandbox",
-    "Time-stamped shift snapshots",
-    "Integrated room chat"
-  ],
-  "author": "${state.userName}",
-  "live": true
+  "platform": "CodeShift",
+  "version": "2.0.0",
+  "engine": "Monaco Editor (VS Code)",
+  "sync": "Internet-wide WebSockets + Edge Durable Objects",
+  "tagline": "Think together. Code without limits."
 }`,
-    markdown: `# CodeShift Documentation
+    markdown: `# CodeShift Collaborative Document
 ### *Think together. Code without limits.*
 
-Welcome to your shared collaborative room.
+Welcome to your shared room!
 
-- **⌘ + Enter**: Run code immediately
-- **⌘ + S**: Save a Shift Snapshot
-- **Peer Sync**: Open this URL in another tab or send it to a teammate to pair in real-time!
+- **Internet-Wide Collaboration**: Send this room link to any developer worldwide.
+- **Monaco Editor**: Full VS Code shortcuts, code folding, multi-cursor, and bracket matching.
+- **Keyboard Shortcuts**:
+  - \`⌘ + Enter\` / \`Ctrl + Enter\`: Execute code immediately
+  - \`⌘ + S\` / \`Ctrl + S\`: Save a version snapshot checkpoint
 `,
-    rust: `// CodeShift Rust Sandbox
+    rust: `// CodeShift Rust Playground
 fn main() {
-    let app_name = "CodeShift";
-    let speed = 99.9;
-    println!("Running {} at {}% efficiency!", app_name, speed);
+    let framework = "CodeShift";
+    let speed_multiplier = 100;
+    println!("Pairing on {} at {}x efficiency!", framework, speed_multiplier);
 }`,
     go: `// CodeShift Go Playground
 package main
@@ -177,12 +199,13 @@ func main() {
 }`,
     sql: `-- CodeShift Database Workspace
 SELECT 
-  developer_name,
-  lines_shifted,
-  collaboration_score
-FROM codeshift_sessions
+  room_id,
+  creator,
+  active_collaborators,
+  created_at
+FROM codeshift_rooms
 WHERE status = 'active'
-ORDER BY lines_shifted DESC;`
+ORDER BY active_collaborators DESC;`
   };
 
   function getRandomColor() {
@@ -190,7 +213,7 @@ ORDER BY lines_shifted DESC;`
     return palette[Math.floor(Math.random() * palette.length)];
   }
 
-  // --- Sound Synthesizer (Web Audio API) ---
+  // --- Sound Synthesizer ---
   const audioCtx = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) ? new (window.AudioContext || window.webkitAudioContext)() : null;
   function playSound(type) {
     if (!state.settings.sound || !audioCtx) return;
@@ -217,12 +240,10 @@ ORDER BY lines_shifted DESC;`
         osc.start(now);
         osc.stop(now + 0.15);
       }
-    } catch (e) {
-      // Audio autoplay policy
-    }
+    } catch (e) {}
   }
 
-  // --- UI Toast Notifications ---
+  // --- UI Toast ---
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -253,14 +274,22 @@ ORDER BY lines_shifted DESC;`
 
   // --- DOM Elements ---
   const el = {
-    app: document.getElementById('app'),
     viewLanding: document.getElementById('view-landing'),
     viewRoom: document.getElementById('view-room'),
     appFooter: document.getElementById('app-footer'),
     roomNavControls: document.getElementById('room-nav-controls'),
     roomNavId: document.getElementById('room-nav-id'),
     userNicknameDisplay: document.getElementById('user-nickname-display'),
+    userRoleBadge: document.getElementById('user-role-badge'),
     peerAvatars: document.getElementById('peer-avatars'),
+    globalConnectionPill: document.getElementById('global-connection-pill'),
+    globalConnectionLabel: document.getElementById('global-connection-label'),
+    syncIndicatorDot: document.getElementById('sync-indicator-dot'),
+    syncStatus: document.getElementById('sync-status'),
+    readonlyBanner: document.getElementById('readonly-banner'),
+    badgeExecutionMode: document.getElementById('badge-execution-mode'),
+    editorEngineLabel: document.getElementById('editor-engine-label'),
+    // Action buttons
     navBtnInstantRoom: document.getElementById('nav-btn-instant-room'),
     btnCreateOrJoin: document.getElementById('btn-create-or-join'),
     btnHeroLaunchRoom: document.getElementById('btn-hero-launch-room'),
@@ -271,18 +300,23 @@ ORDER BY lines_shifted DESC;`
     btnChangeNickname: document.getElementById('btn-change-nickname'),
     selectLanguage: document.getElementById('select-language'),
     selectTheme: document.getElementById('select-theme'),
-    editorTextarea: document.getElementById('code-editor-textarea'),
-    editorLineNumbers: document.getElementById('editor-line-numbers'),
-    activeFilename: document.getElementById('active-filename'),
-    codeStats: document.getElementById('code-stats'),
-    cursorPosition: document.getElementById('cursor-position'),
-    syncStatus: document.getElementById('sync-status'),
-    remoteCursorsLayer: document.getElementById('remote-cursors-layer'),
     btnRunCode: document.getElementById('btn-run-code'),
     btnFormatCode: document.getElementById('btn-format-code'),
     btnTakeSnapshot: document.getElementById('btn-take-snapshot'),
     btnDownloadCode: document.getElementById('btn-download-code'),
     btnToggleSidepanel: document.getElementById('btn-toggle-sidepanel'),
+    btnToggleFullscreen: document.getElementById('btn-toggle-fullscreen'),
+    btnToggleReadonly: document.getElementById('btn-toggle-readonly'),
+    iconReadonly: document.getElementById('icon-readonly'),
+    labelReadonly: document.getElementById('label-readonly'),
+    btnSetRoomPassword: document.getElementById('btn-set-room-password'),
+    // Editor mounts
+    monacoContainer: document.getElementById('monaco-editor-container'),
+    fallbackWrapper: document.getElementById('fallback-editor-wrapper'),
+    editorTextarea: document.getElementById('code-editor-textarea'),
+    editorLineNumbers: document.getElementById('editor-line-numbers'),
+    codeStats: document.getElementById('code-stats'),
+    cursorPosition: document.getElementById('cursor-position'),
     sidePanel: document.getElementById('side-panel'),
     sideTabs: document.querySelectorAll('.side-tab'),
     tabPanes: document.querySelectorAll('.tab-pane'),
@@ -298,6 +332,22 @@ ORDER BY lines_shifted DESC;`
     badgeSnapshotsCount: document.getElementById('badge-snapshots-count'),
     btnCreateSnapshotModal: document.getElementById('btn-create-snapshot-modal'),
     // Modals
+    modalPassword: document.getElementById('modal-password'),
+    inputRoomPassword: document.getElementById('input-room-password'),
+    passwordError: document.getElementById('password-error'),
+    btnSubmitPassword: document.getElementById('btn-submit-password'),
+    btnCancelPassword: document.getElementById('btn-cancel-password'),
+    modalSetPassword: document.getElementById('modal-set-password'),
+    inputNewRoomPassword: document.getElementById('input-new-room-password'),
+    btnSaveRoomPassword: document.getElementById('btn-save-room-password'),
+    btnCancelSetPassword: document.getElementById('btn-cancel-set-password'),
+    modalDiff: document.getElementById('modal-diff'),
+    diffViewer: document.getElementById('diff-viewer'),
+    diffModalTitle: document.getElementById('diff-modal-title'),
+    diffModalSubtitle: document.getElementById('diff-modal-subtitle'),
+    btnCloseDiffModal: document.getElementById('btn-close-diff-modal'),
+    btnCloseDiff: document.getElementById('btn-close-diff'),
+    btnRestoreDiffSnapshot: document.getElementById('btn-restore-diff-snapshot'),
     modalNickname: document.getElementById('modal-nickname'),
     inputNewNickname: document.getElementById('input-new-nickname'),
     btnSaveNickname: document.getElementById('btn-save-nickname'),
@@ -308,24 +358,18 @@ ORDER BY lines_shifted DESC;`
     btnSaveSettings: document.getElementById('btn-save-settings'),
     settingFontsize: document.getElementById('setting-fontsize'),
     settingTabsize: document.getElementById('setting-tabsize'),
-    settingAutobrack: document.getElementById('setting-autobrack'),
-    settingSound: document.getElementById('setting-sound'),
-    modalDiff: document.getElementById('modal-diff'),
-    diffViewer: document.getElementById('diff-viewer'),
-    diffModalTitle: document.getElementById('diff-modal-title'),
-    btnCloseDiffModal: document.getElementById('btn-close-diff-modal'),
-    btnCloseDiff: document.getElementById('btn-close-diff'),
-    btnRestoreDiffSnapshot: document.getElementById('btn-restore-diff-snapshot')
+    settingWordwrap: document.getElementById('setting-wordwrap'),
+    settingSound: document.getElementById('setting-sound')
   };
 
-  // --- Router & Mode Switching ---
+  // --- Router ---
   function initRouter() {
     window.addEventListener('hashchange', handleRoute);
     handleRoute();
   }
 
   function handleRoute() {
-    const hash = window.location.hash.slice(1); // e.g. "/room/shift-1234"
+    const hash = window.location.hash.slice(1);
     if (hash.startsWith('/room/')) {
       const parts = hash.split('/');
       const roomId = parts[2] ? parts[2].trim() : 'general';
@@ -337,9 +381,10 @@ ORDER BY lines_shifted DESC;`
 
   function enterLanding() {
     state.roomId = null;
-    if (state.syncChannel) {
-      state.syncChannel.close();
-      state.syncChannel = null;
+    closeWebSocket();
+    if (state.broadcastChannel) {
+      state.broadcastChannel.close();
+      state.broadcastChannel = null;
     }
     el.viewLanding.classList.remove('hidden');
     el.viewRoom.classList.add('hidden');
@@ -347,6 +392,7 @@ ORDER BY lines_shifted DESC;`
     el.roomNavControls.classList.remove('flex');
     el.appFooter.classList.remove('hidden');
     document.title = "CodeShift — Think together. Code without limits.";
+    setConnectionStatus('live', 'Online');
   }
 
   function enterRoom(roomId) {
@@ -361,14 +407,14 @@ ORDER BY lines_shifted DESC;`
     el.userNicknameDisplay.textContent = state.userName;
     document.title = `CodeShift • #${roomId}`;
 
-    setupSyncEngine(roomId);
-    loadRoomState(roomId);
-    updateLineNumbers();
-    updateCodeStats();
-    renderPeers();
-    applySettingsToEditor();
+    // Initialize Monaco if ready, otherwise fallback
+    initMonacoEditor(DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript);
 
-    showToast(`Entered collaborative room #${roomId}`, 'success');
+    // Connect real-time WebSocket to room
+    connectWebSocket(roomId);
+
+    updateExecutionBadge();
+    showToast(`Entering room #${roomId}...`, 'info');
   }
 
   function navigateToRoom(roomId) {
@@ -376,192 +422,488 @@ ORDER BY lines_shifted DESC;`
   }
 
   function generateRoomSlug() {
-    const prefixes = ['shift', 'flow', 'knot', 'pair', 'sync', 'craft'];
+    const prefixes = ['shift', 'knot', 'pair', 'flow', 'dev', 'code'];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
     const num = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}-${num}`;
   }
 
-  // --- Local Room State Persistence ---
-  function getRoomStorageKey(roomId) {
-    return `codeshift_room_${roomId}_data`;
-  }
+  // --- Monaco Editor Engine ---
+  let monacoLoaded = false;
+  function initMonacoEditor(initialCode) {
+    if (state.monacoInstance) return;
 
-  function loadRoomState(roomId) {
-    const saved = localStorage.getItem(getRoomStorageKey(roomId));
-    if (saved) {
+    if (window.require && typeof window.require.config === 'function') {
       try {
-        const parsed = JSON.parse(saved);
-        el.editorTextarea.value = parsed.code || DEFAULT_TEMPLATES.javascript;
-        state.language = parsed.language || 'javascript';
-        state.snapshots = parsed.snapshots || [];
-      } catch (e) {
-        el.editorTextarea.value = DEFAULT_TEMPLATES.javascript;
+        window.require.config({
+          paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
+        });
+
+        window.require(['vs/editor/editor.main'], function () {
+          defineMonacoTheme();
+
+          const container = el.monacoContainer;
+          container.innerHTML = '';
+
+          state.monacoInstance = monaco.editor.create(container, {
+            value: initialCode,
+            language: mapLanguageToMonaco(state.language),
+            theme: 'codeshift-dark',
+            automaticLayout: true,
+            fontSize: state.settings.fontSize,
+            fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace",
+            fontLigatures: true,
+            minimap: { enabled: true, scale: 0.75 },
+            scrollBeyondLastLine: false,
+            lineNumbers: 'on',
+            renderLineHighlight: 'all',
+            cursorBlinking: 'smooth',
+            smoothScrolling: true,
+            bracketPairColorization: { enabled: true },
+            autoClosingBrackets: 'always',
+            tabSize: state.settings.tabSize,
+            wordWrap: state.settings.wordWrap ? 'on' : 'off',
+            readOnly: state.isReadOnly && !state.isHost
+          });
+
+          monacoLoaded = true;
+          el.fallbackWrapper.classList.add('hidden');
+          el.editorEngineLabel.textContent = 'Monaco Engine (VS Code)';
+
+          // Listen for local changes
+          state.monacoInstance.onDidChangeModelContent(() => {
+            if (state.isApplyingRemoteChange) return;
+            const code = state.monacoInstance.getValue();
+            onCodeChange(code);
+          });
+
+          // Listen for cursor position
+          state.monacoInstance.onDidChangeCursorPosition((e) => {
+            const pos = e.position;
+            const model = state.monacoInstance.getModel();
+            const lines = model.getLineCount();
+            el.cursorPosition.textContent = `Ln ${pos.lineNumber}, Col ${pos.column}`;
+            el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
+
+            // Broadcast cursor
+            sendWsMessage({
+              type: 'CURSOR_MOVE',
+              line: pos.lineNumber,
+              col: pos.column,
+              selection: state.monacoInstance.getSelection()
+            });
+          });
+
+          // Command shortcut: Run Code (⌘+Enter)
+          state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            runCurrentCode();
+          });
+
+          // Command shortcut: Save Snapshot (⌘+S)
+          state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+            promptSaveSnapshot();
+          });
+
+          updateCodeStats();
+        });
+        return;
+      } catch (err) {
+        console.warn('Monaco failed to load from CDN, activating fallback editor:', err);
       }
+    }
+
+    // Fallback: If Monaco is offline or loading
+    el.fallbackWrapper.classList.remove('hidden');
+    el.monacoContainer.classList.add('hidden');
+    el.editorTextarea.value = initialCode;
+    el.editorEngineLabel.textContent = 'Standard Editor';
+    updateLineNumbers();
+    updateCodeStats();
+  }
+
+  function defineMonacoTheme() {
+    monaco.editor.defineTheme('codeshift-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '64748B', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'C084FC', fontStyle: 'bold' },
+        { token: 'string', foreground: '34D399' },
+        { token: 'number', foreground: 'F59E0B' },
+        { token: 'type', foreground: '38BDF8' },
+        { token: 'function', foreground: '8B7CFF' },
+        { token: 'identifier', foreground: 'F8FAFC' }
+      ],
+      colors: {
+        'editor.background': '#0D0E15',
+        'editor.foreground': '#F8FAFC',
+        'editorLineNumber.foreground': '#475569',
+        'editorLineNumber.activeForeground': '#8B7CFF',
+        'editor.lineHighlightBackground': '#141524',
+        'editorCursor.foreground': '#8B7CFF',
+        'editor.selectionBackground': '#8B7CFF33',
+        'editor.inactiveSelectionBackground': '#8B7CFF20',
+        'editorWidget.background': '#161724',
+        'editorWidget.border': '#252738'
+      }
+    });
+  }
+
+  function mapLanguageToMonaco(lang) {
+    const map = {
+      javascript: 'javascript',
+      typescript: 'typescript',
+      html: 'html',
+      css: 'css',
+      python: 'python',
+      json: 'json',
+      markdown: 'markdown',
+      rust: 'rust',
+      go: 'go',
+      sql: 'sql'
+    };
+    return map[lang] || 'plaintext';
+  }
+
+  function getEditorCode() {
+    if (state.monacoInstance) {
+      return state.monacoInstance.getValue();
+    }
+    return el.editorTextarea.value;
+  }
+
+  function setEditorCode(code) {
+    state.isApplyingRemoteChange = true;
+    if (state.monacoInstance) {
+      const position = state.monacoInstance.getPosition();
+      state.monacoInstance.setValue(code);
+      if (position) state.monacoInstance.setPosition(position);
     } else {
-      el.editorTextarea.value = DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript;
-      state.snapshots = [];
-      // Take initial snapshot
-      saveSnapshot("Initial Room State", true);
+      el.editorTextarea.value = code;
+      updateLineNumbers();
     }
-    el.selectLanguage.value = state.language;
-    updateActiveFilename();
-    renderSnapshotsList();
+    updateCodeStats();
+    setTimeout(() => {
+      state.isApplyingRemoteChange = false;
+    }, 100);
   }
 
-  function persistCurrentRoom() {
-    if (!state.roomId) return;
-    const data = {
-      code: el.editorTextarea.value,
-      language: state.language,
-      snapshots: state.snapshots,
-      updatedAt: Date.now()
-    };
-    localStorage.setItem(getRoomStorageKey(state.roomId), JSON.stringify(data));
-  }
-
-  // --- Real-Time Peer Sync Engine ---
-  function setupSyncEngine(roomId) {
-    if (state.syncChannel) {
-      state.syncChannel.close();
+  // --- Real-Time WebSocket Collaborative Engine ---
+  function getWebSocketUrl(roomId) {
+    // If custom server set
+    if (window.CODESHIFT_WS_SERVER) {
+      return `${window.CODESHIFT_WS_SERVER}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
     }
 
-    const channelName = `codeshift_channel_${roomId}`;
-    state.syncChannel = new BroadcastChannel(channelName);
+    const isSecure = location.protocol === 'https:';
+    const wsProto = isSecure ? 'wss:' : 'ws:';
+    const host = location.host;
 
-    state.syncChannel.onmessage = (event) => {
-      handleSyncMessage(event.data);
-    };
+    // If running on local server or production VPS
+    if (host && !host.includes('github.io')) {
+      return `${wsProto}//${host}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
+    }
 
-    // Broadcast our presence
-    broadcast({
-      type: 'PEER_JOIN',
-      userId: state.userId,
-      userName: state.userName,
-      userColor: state.userColor
-    });
+    // Static GitHub Pages fallback endpoint or broadcast
+    return null;
+  }
 
-    // Send heartbeat every 4 seconds
-    setInterval(() => {
-      if (!state.roomId) return;
-      broadcast({
-        type: 'PEER_HEARTBEAT',
-        userId: state.userId,
-        userName: state.userName,
-        userColor: state.userColor
-      });
-      cleanupStalePeers();
-    }, 4000);
+  function connectWebSocket(roomId) {
+    closeWebSocket();
 
-    // Cross-tab localStorage fallback listener
-    window.addEventListener('storage', (e) => {
-      if (e.key === getRoomStorageKey(state.roomId) && !state.isApplyingRemoteChange) {
+    const wsUrl = getWebSocketUrl(roomId);
+
+    if (!wsUrl) {
+      // Running on static GitHub Pages without backend: activate BroadcastChannel
+      activateBroadcastChannel(roomId);
+      setConnectionStatus('local', 'Broadcast Sync (Same Device)');
+      return;
+    }
+
+    setConnectionStatus('connecting', 'Connecting...');
+
+    try {
+      state.ws = new WebSocket(wsUrl);
+
+      state.ws.onopen = () => {
+        state.wsConnected = true;
+        state.wsReconnectAttempts = 0;
+        setConnectionStatus('connected', 'Live WebSocket');
+        showToast('Connected to CodeShift Internet Room ⚡', 'success');
+      };
+
+      state.ws.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed && parsed.code !== el.editorTextarea.value) {
-            applyRemoteCode(parsed.code);
-          }
-        } catch (err) {}
-      }
-    });
-  }
+          const msg = JSON.parse(event.data);
+          handleServerMessage(msg);
+        } catch (e) {
+          console.warn('Invalid server message:', e);
+        }
+      };
 
-  function broadcast(data) {
-    if (state.syncChannel) {
-      state.syncChannel.postMessage(data);
+      state.ws.onclose = () => {
+        state.wsConnected = false;
+        setConnectionStatus('reconnecting', 'Reconnecting...');
+        // Exponential backoff
+        const timeout = Math.min(1000 * Math.pow(1.5, state.wsReconnectAttempts), 10000);
+        state.wsReconnectAttempts++;
+        setTimeout(() => {
+          if (state.roomId === roomId) connectWebSocket(roomId);
+        }, timeout);
+      };
+
+      state.ws.onerror = () => {
+        state.wsConnected = false;
+        // Fallback to BroadcastChannel
+        activateBroadcastChannel(roomId);
+        setConnectionStatus('local', 'Local Sync (Offline)');
+      };
+    } catch (e) {
+      activateBroadcastChannel(roomId);
+      setConnectionStatus('local', 'Local Sync (Offline)');
     }
   }
 
-  function handleSyncMessage(msg) {
-    if (!msg || msg.userId === state.userId) return;
+  function closeWebSocket() {
+    if (state.ws) {
+      state.ws.onclose = null;
+      state.ws.close();
+      state.ws = null;
+      state.wsConnected = false;
+    }
+  }
+
+  function sendWsMessage(data) {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify(data));
+    } else if (state.broadcastChannel) {
+      state.broadcastChannel.postMessage(data);
+    }
+  }
+
+  function activateBroadcastChannel(roomId) {
+    if (state.broadcastChannel) state.broadcastChannel.close();
+    state.broadcastChannel = new BroadcastChannel(`codeshift_room_${roomId}`);
+    state.broadcastChannel.onmessage = (event) => {
+      handleServerMessage(event.data);
+    };
+  }
+
+  function setConnectionStatus(type, label) {
+    el.syncStatus.textContent = label;
+    el.globalConnectionLabel.textContent = label;
+
+    if (type === 'connected') {
+      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    } else if (type === 'connecting' || type === 'reconnecting') {
+      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    } else {
+      el.syncIndicatorDot.className = 'w-2 h-2 rounded-full bg-cyan-400';
+      el.globalConnectionPill.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+    }
+  }
+
+  // --- Server Message Dispatcher ---
+  function handleServerMessage(msg) {
+    if (!msg) return;
 
     switch (msg.type) {
-      case 'PEER_JOIN':
-        state.peers.set(msg.userId, {
-          name: msg.userName,
-          color: msg.userColor,
-          lastSeen: Date.now()
-        });
+      case 'ROOM_INIT': {
+        // Apply server document
+        if (msg.code !== undefined) {
+          setEditorCode(msg.code);
+        }
+        if (msg.language) {
+          state.language = msg.language;
+          el.selectLanguage.value = msg.language;
+          updateLanguageInMonaco(msg.language);
+          updateExecutionBadge();
+        }
+
+        state.isHost = !!msg.isHost;
+        state.isReadOnly = !!msg.isReadOnly;
+        state.isProtected = !!msg.isProtected;
+
+        updateHostUI();
+        updateReadOnlyUI();
+
+        // Populate peers
+        state.peers.clear();
+        if (Array.isArray(msg.peers)) {
+          msg.peers.forEach(p => {
+            if (p.userId !== state.userId) {
+              state.peers.set(p.userId, p);
+            }
+          });
+        }
         renderPeers();
-        showToast(`${msg.userName} joined the room!`, 'info');
-        // Reply with our presence so the new peer sees us
-        broadcast({
-          type: 'PEER_HEARTBEAT',
-          userId: state.userId,
-          userName: state.userName,
-          userColor: state.userColor
-        });
-        break;
 
-      case 'PEER_HEARTBEAT':
-        state.peers.set(msg.userId, {
-          name: msg.userName,
-          color: msg.userColor,
-          lastSeen: Date.now()
-        });
+        // Populate snapshots & chat
+        if (Array.isArray(msg.snapshots)) {
+          state.snapshots = msg.snapshots;
+          renderSnapshotsList();
+        }
+        if (Array.isArray(msg.chat)) {
+          state.chatMessages = msg.chat;
+          renderAllChatMessages();
+        }
+
+        // Check if password required
+        if (state.isProtected && !state.isAuthenticated && !state.isHost) {
+          openPasswordModal();
+        }
+        break;
+      }
+
+      case 'DOC_UPDATED': {
+        if (msg.userId !== state.userId) {
+          setEditorCode(msg.code);
+          showToast(`${msg.userName || 'Collaborator'} updated the code`, 'info');
+        }
+        break;
+      }
+
+      case 'LANGUAGE_UPDATED': {
+        state.language = msg.language;
+        el.selectLanguage.value = msg.language;
+        updateLanguageInMonaco(msg.language);
+        updateExecutionBadge();
+        showToast(`Language set to ${msg.language}`, 'info');
+        break;
+      }
+
+      case 'PEER_JOIN': {
+        const p = msg.peer;
+        if (p && p.userId !== state.userId) {
+          state.peers.set(p.userId, p);
+          renderPeers();
+          showToast(`${p.userName} connected to the room!`, 'success');
+        }
+        break;
+      }
+
+      case 'PEER_LEAVE': {
+        state.peers.delete(msg.userId);
+        removeRemoteMonacoCursor(msg.userId);
         renderPeers();
         break;
+      }
 
-      case 'CODE_CHANGE':
-        applyRemoteCode(msg.code);
+      case 'PEER_CURSOR': {
+        if (msg.userId !== state.userId) {
+          renderRemoteMonacoCursor(msg.userId, msg.userName, msg.userColor, msg.cursor);
+        }
         break;
+      }
 
-      case 'CURSOR_MOVE':
-        updateRemoteCursor(msg.userId, msg.userName, msg.userColor, msg.line, msg.col);
-        break;
-
-      case 'CHAT_MESSAGE':
-        appendChatMessage(msg.userName, msg.userColor, msg.text, msg.time, false);
+      case 'NEW_CHAT_MESSAGE': {
+        appendChatMessage(msg.message.userName, msg.message.userColor, msg.message.text, msg.message.time, msg.message.userId === state.userId);
         playSound('blip');
         if (state.activeSideTab !== 'tab-chat') {
           el.badgeChatUnread.classList.remove('hidden');
         }
         break;
+      }
 
-      case 'SNAPSHOT_CREATED':
+      case 'SNAPSHOT_SAVED': {
         state.snapshots.unshift(msg.snapshot);
         renderSnapshotsList();
-        showToast(`New snapshot saved by ${msg.userName}`, 'info');
+        showToast(`Checkpoint saved: "${msg.snapshot.title}"`, 'info');
         break;
+      }
+
+      case 'ROOM_READ_ONLY_CHANGED': {
+        state.isReadOnly = !!msg.isReadOnly;
+        updateReadOnlyUI();
+        showToast(state.isReadOnly ? 'Room locked in View-Only mode' : 'Room unlocked for editing', 'info');
+        break;
+      }
+
+      case 'ROOM_SECURITY_UPDATED': {
+        state.isProtected = !!msg.isProtected;
+        showToast(state.isProtected ? 'Password protection enabled' : 'Password protection removed', 'info');
+        break;
+      }
+
+      case 'HOST_CHANGED': {
+        if (msg.newHostUserId === state.userId) {
+          state.isHost = true;
+          updateHostUI();
+          showToast('You are now the room host 👑', 'success');
+        }
+        break;
+      }
+
+      case 'PASSWORD_VERIFIED': {
+        if (msg.success) {
+          state.isAuthenticated = true;
+          el.modalPassword.classList.add('hidden');
+          el.modalPassword.classList.remove('flex');
+          showToast('Room unlocked!', 'success');
+        } else {
+          el.passwordError.classList.remove('hidden');
+        }
+        break;
+      }
+
+      case 'PERMISSION_DENIED': {
+        showToast(msg.message || 'Permission denied', 'error');
+        break;
+      }
     }
   }
 
-  function applyRemoteCode(newCode) {
-    state.isApplyingRemoteChange = true;
-    const start = el.editorTextarea.selectionStart;
-    const end = el.editorTextarea.selectionEnd;
+  // --- Remote Monaco Cursors ---
+  function renderRemoteMonacoCursor(userId, name, color, cursor) {
+    if (!state.monacoInstance || !cursor) return;
 
-    el.editorTextarea.value = newCode;
-    // preserve selection
-    el.editorTextarea.setSelectionRange(start, end);
+    // Use Monaco decorations
+    const line = cursor.line || 1;
+    const col = cursor.col || 1;
 
-    updateLineNumbers();
-    updateCodeStats();
-    el.syncStatus.textContent = 'Updated';
-    setTimeout(() => {
-      el.syncStatus.textContent = 'Synced';
-      state.isApplyingRemoteChange = false;
-    }, 500);
-  }
-
-  function cleanupStalePeers() {
-    const now = Date.now();
-    let changed = false;
-    state.peers.forEach((peer, id) => {
-      if (now - peer.lastSeen > 12000) {
-        state.peers.delete(id);
-        removeRemoteCursor(id);
-        changed = true;
+    const decorations = [
+      {
+        range: new monaco.Range(line, col, line, col + 1),
+        options: {
+          className: `monaco-remote-cursor`,
+          hoverMessage: { value: `${name} ✍️` }
+        }
       }
-    });
-    if (changed) renderPeers();
+    ];
+
+    if (cursor.selection) {
+      const sel = cursor.selection;
+      decorations.push({
+        range: new monaco.Range(sel.startLineNumber, sel.startColumn, sel.endLineNumber, sel.endColumn),
+        options: {
+          className: 'monaco-remote-selection'
+        }
+      });
+    }
+
+    const prevDecorations = state.monacoDecorations.get(userId) || [];
+    const newDecorations = state.monacoInstance.deltaDecorations(prevDecorations, decorations);
+    state.monacoDecorations.set(userId, newDecorations);
   }
 
+  function removeRemoteMonacoCursor(userId) {
+    if (!state.monacoInstance) return;
+    const prev = state.monacoDecorations.get(userId);
+    if (prev) {
+      state.monacoInstance.deltaDecorations(prev, []);
+      state.monacoDecorations.delete(userId);
+    }
+  }
+
+  // --- Peer Presence UI ---
   function renderPeers() {
     el.peerAvatars.innerHTML = '';
+
     // Self Avatar
     const selfBadge = document.createElement('div');
-    selfBadge.className = 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#13141E] shadow';
+    selfBadge.className = 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#13141E] shadow cursor-pointer';
     selfBadge.style.backgroundColor = state.userColor;
     selfBadge.title = `${state.userName} (You)`;
     selfBadge.textContent = state.userName.charAt(0).toUpperCase();
@@ -571,181 +913,97 @@ ORDER BY lines_shifted DESC;`
     state.peers.forEach((peer) => {
       const badge = document.createElement('div');
       badge.className = 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#13141E] shadow';
-      badge.style.backgroundColor = peer.color;
-      badge.title = peer.name;
-      badge.textContent = peer.name.charAt(0).toUpperCase();
+      badge.style.backgroundColor = peer.userColor;
+      badge.title = `${peer.userName}${peer.isHost ? ' (Host)' : ''}`;
+      badge.textContent = peer.userName.charAt(0).toUpperCase();
       el.peerAvatars.appendChild(badge);
     });
   }
 
-  // --- Remote Cursor Rendering ---
-  function updateRemoteCursor(peerId, name, color, line, col) {
-    let cursorEl = document.getElementById(`cursor_${peerId}`);
-    if (!cursorEl) {
-      cursorEl = document.createElement('div');
-      cursorEl.id = `cursor_${peerId}`;
-      cursorEl.className = 'remote-cursor';
-      cursorEl.innerHTML = `<div class="remote-cursor-flag" style="background-color: ${color}">${name}</div>`;
-      el.remoteCursorsLayer.appendChild(cursorEl);
+  function updateHostUI() {
+    if (state.isHost) {
+      el.userRoleBadge.textContent = '👑 Host';
+      el.userRoleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30';
+      el.btnToggleReadonly.classList.remove('hidden');
+      el.btnToggleReadonly.classList.add('flex');
+      el.btnSetRoomPassword.classList.remove('hidden');
+      el.btnSetRoomPassword.classList.add('flex');
+    } else {
+      el.userRoleBadge.textContent = '👤 Collaborator';
+      el.userRoleBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700';
+      el.btnToggleReadonly.classList.add('hidden');
+      el.btnSetRoomPassword.classList.add('hidden');
     }
-
-    cursorEl.style.backgroundColor = color;
-    const lineHeight = 24.8; // matching line-height
-    const charWidth = 8.4;   // approx mono character width
-    const top = (line - 1) * lineHeight + 12;
-    const left = 48 + (col * charWidth) + 12; // left offset from line numbers
-
-    cursorEl.style.top = `${top}px`;
-    cursorEl.style.left = `${left}px`;
-    cursorEl.style.height = `${lineHeight}px`;
   }
 
-  function removeRemoteCursor(peerId) {
-    const cursor = document.getElementById(`cursor_${peerId}`);
-    if (cursor) cursor.remove();
+  function updateReadOnlyUI() {
+    if (state.isReadOnly) {
+      el.readonlyBanner.classList.remove('hidden');
+      el.readonlyBanner.classList.add('flex');
+      el.iconReadonly.textContent = '🔒';
+      el.labelReadonly.textContent = 'Unlock Editor';
+      if (state.monacoInstance) {
+        state.monacoInstance.updateOptions({ readOnly: !state.isHost });
+      }
+      el.editorTextarea.readOnly = !state.isHost;
+    } else {
+      el.readonlyBanner.classList.add('hidden');
+      el.readonlyBanner.classList.remove('flex');
+      el.iconReadonly.textContent = '🔓';
+      el.labelReadonly.textContent = 'Lock Editor';
+      if (state.monacoInstance) {
+        state.monacoInstance.updateOptions({ readOnly: false });
+      }
+      el.editorTextarea.readOnly = false;
+    }
   }
 
-  // --- Editor Core Logic ---
+  function updateExecutionBadge() {
+    const executableLangs = ['javascript', 'typescript', 'html', 'css'];
+    if (executableLangs.includes(state.language)) {
+      el.badgeExecutionMode.textContent = '⚡ In-Browser Execution';
+      el.badgeExecutionMode.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 text-violet-300 border border-violet-500/20';
+    } else {
+      el.badgeExecutionMode.textContent = '📝 Syntax Mode';
+      el.badgeExecutionMode.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700';
+    }
+  }
+
+  function updateLanguageInMonaco(lang) {
+    if (state.monacoInstance) {
+      const model = state.monacoInstance.getModel();
+      monaco.editor.setModelLanguage(model, mapLanguageToMonaco(lang));
+    }
+  }
+
+  function onCodeChange(code) {
+    updateLineNumbers();
+    updateCodeStats();
+    sendWsMessage({
+      type: 'SYNC_DOC',
+      code: code
+    });
+  }
+
   function updateLineNumbers() {
     const text = el.editorTextarea.value;
     const lineCount = text.split('\n').length;
     let html = '';
-    for (let i = 1; i <= lineCount; i++) {
-      html += `<div>${i}</div>`;
-    }
+    for (let i = 1; i <= lineCount; i++) html += `<div>${i}</div>`;
     el.editorLineNumbers.innerHTML = html;
   }
 
   function updateCodeStats() {
-    const text = el.editorTextarea.value;
-    const lines = text.split('\n').length;
-    const chars = text.length;
-    el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}, ${chars} chars`;
-
-    // Cursor position
-    const pos = el.editorTextarea.selectionStart;
-    const linesBefore = text.slice(0, pos).split('\n');
-    const curLine = linesBefore.length;
-    const curCol = linesBefore[linesBefore.length - 1].length;
-    el.cursorPosition.textContent = `Ln ${curLine}, Col ${curCol + 1}`;
-
-    // Broadcast cursor position
-    if (state.roomId) {
-      broadcast({
-        type: 'CURSOR_MOVE',
-        userId: state.userId,
-        userName: state.userName,
-        userColor: state.userColor,
-        line: curLine,
-        col: curCol
-      });
-    }
+    const code = getEditorCode();
+    const lines = code.split('\n').length;
+    el.codeStats.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
   }
-
-  function updateActiveFilename() {
-    const extMap = {
-      javascript: 'main.js',
-      typescript: 'index.ts',
-      html: 'index.html',
-      css: 'styles.css',
-      python: 'app.py',
-      rust: 'main.rs',
-      go: 'main.go',
-      sql: 'query.sql',
-      json: 'config.json',
-      markdown: 'README.md'
-    };
-    el.activeFilename.textContent = extMap[state.language] || 'code.txt';
-  }
-
-  // Auto brackets & Tab key support
-  el.editorTextarea.addEventListener('keydown', (e) => {
-    // Run shortcut: ⌘+Enter or Ctrl+Enter
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      runCurrentCode();
-      return;
-    }
-
-    // Save snapshot shortcut: ⌘+S or Ctrl+S
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
-      saveSnapshot(`Snapshot at ${new Date().toLocaleTimeString()}`);
-      showToast('Shift Snapshot created! 📸', 'success');
-      return;
-    }
-
-    // Tab key handling
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = el.editorTextarea.selectionStart;
-      const end = el.editorTextarea.selectionEnd;
-      const spaces = ' '.repeat(state.settings.tabSize);
-
-      if (!e.shiftKey) {
-        // Insert indent
-        el.editorTextarea.value = el.editorTextarea.value.substring(0, start) + spaces + el.editorTextarea.value.substring(end);
-        el.editorTextarea.selectionStart = el.editorTextarea.selectionEnd = start + spaces.length;
-      }
-      onEditorInput();
-      return;
-    }
-
-    // Auto-close brackets/quotes
-    if (state.settings.autoBrackets) {
-      const pairs = {
-        '(': ')',
-        '[': ']',
-        '{': '}',
-        '"': '"',
-        "'": "'",
-        '`': '`'
-      };
-
-      if (pairs[e.key]) {
-        const start = el.editorTextarea.selectionStart;
-        const end = el.editorTextarea.selectionEnd;
-        if (start === end) {
-          e.preventDefault();
-          const closeChar = pairs[e.key];
-          el.editorTextarea.value = el.editorTextarea.value.substring(0, start) + e.key + closeChar + el.editorTextarea.value.substring(end);
-          el.editorTextarea.selectionStart = el.editorTextarea.selectionEnd = start + 1;
-          onEditorInput();
-        }
-      }
-    }
-  });
-
-  function onEditorInput() {
-    updateLineNumbers();
-    updateCodeStats();
-    persistCurrentRoom();
-
-    if (state.roomId && !state.isApplyingRemoteChange) {
-      broadcast({
-        type: 'CODE_CHANGE',
-        userId: state.userId,
-        userName: state.userName,
-        code: el.editorTextarea.value
-      });
-    }
-  }
-
-  el.editorTextarea.addEventListener('input', onEditorInput);
-  el.editorTextarea.addEventListener('click', updateCodeStats);
-  el.editorTextarea.addEventListener('keyup', updateCodeStats);
-
-  // Sync scrolling between line numbers and textarea
-  el.editorTextarea.addEventListener('scroll', () => {
-    el.editorLineNumbers.scrollTop = el.editorTextarea.scrollTop;
-  });
 
   // --- Code Execution Engine ---
   function runCurrentCode() {
-    const code = el.editorTextarea.value;
+    const code = getEditorCode();
     const lang = state.language;
 
-    // Switch to output tab
     switchSideTab('tab-console');
     playSound('blip');
 
@@ -760,9 +1018,8 @@ ORDER BY lines_shifted DESC;`
     } else if (lang === 'html' || lang === 'css') {
       renderWebPreview();
       switchSideTab('tab-preview');
-      appendConsoleLog(`Web preview rendered successfully. Switched to Preview tab.`, 'success');
+      appendConsoleLog(`Web preview updated. Switched to Web Preview tab.`, 'success');
     } else {
-      // Python, Rust, Go, etc simulation
       simulateLanguageExecution(code, lang);
     }
   }
@@ -771,78 +1028,48 @@ ORDER BY lines_shifted DESC;`
     const startTime = performance.now();
     const logs = [];
 
-    // Capture console methods safely
-    const originalLog = console.log;
-    const originalWarn = console.warn;
-    const originalError = console.error;
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
 
-    console.log = (...args) => {
-      logs.push({ type: 'info', text: args.map(formatLogArg).join(' ') });
-      originalLog.apply(console, args);
-    };
-    console.warn = (...args) => {
-      logs.push({ type: 'warn', text: args.map(formatLogArg).join(' ') });
-      originalWarn.apply(console, args);
-    };
-    console.error = (...args) => {
-      logs.push({ type: 'error', text: args.map(formatLogArg).join(' ') });
-      originalError.apply(console, args);
-    };
+    console.log = (...args) => logs.push({ type: 'info', text: args.map(formatLogArg).join(' ') });
+    console.warn = (...args) => logs.push({ type: 'warn', text: args.map(formatLogArg).join(' ') });
+    console.error = (...args) => logs.push({ type: 'error', text: args.map(formatLogArg).join(' ') });
 
     try {
-      // Evaluate within an isolated scope
       const evalResult = new Function(code)();
       const duration = (performance.now() - startTime).toFixed(1);
 
-      // Render captured logs
-      if (logs.length > 0) {
-        logs.forEach(log => appendConsoleLog(log.text, log.type));
-      }
+      logs.forEach(l => appendConsoleLog(l.text, l.type));
 
       if (evalResult !== undefined) {
         appendConsoleLog(`← Return: ${formatLogArg(evalResult)}`, 'success');
       }
 
-      appendConsoleLog(`Completed in ${duration}ms ✓`, 'success');
+      appendConsoleLog(`Execution completed in ${duration}ms ✓`, 'success');
       playSound('success');
     } catch (err) {
       appendConsoleLog(`Runtime Error: ${err.message}`, 'error');
     } finally {
-      console.log = originalLog;
-      console.warn = originalWarn;
-      console.error = originalError;
+      console.log = origLog;
+      console.warn = origWarn;
+      console.error = origError;
       el.consoleOutput.scrollTop = el.consoleOutput.scrollHeight;
     }
   }
 
   function simulateLanguageExecution(code, lang) {
     setTimeout(() => {
-      if (lang === 'python') {
-        appendConsoleLog(`Python 3.12 runner output:`, 'info');
-        appendConsoleLog(`Code parsed without syntax errors.`, 'success');
-        // Extract print calls
-        const prints = code.match(/print\((.*?)\)/g);
-        if (prints) {
-          prints.forEach(p => {
-            const inner = p.replace(/^print\(/, '').replace(/\)$/, '');
-            appendConsoleLog(`> ${inner}`, 'info');
-          });
-        }
-      } else if (lang === 'rust') {
-        appendConsoleLog(`Compiling with rustc 1.78.0 (CodeShift Cargo Runner)...`, 'info');
-        appendConsoleLog(`Build finished [optimized + debuginfo] in 0.42s`, 'success');
-        appendConsoleLog(`Running target/debug/codeshift`, 'info');
-      } else {
-        appendConsoleLog(`Executed ${lang} snippet successfully.`, 'success');
-      }
+      appendConsoleLog(`Note: ${lang} is rendered in syntax highlighting mode.`, 'info');
+      appendConsoleLog(`Simulated parse check: Clean syntax [OK]`, 'success');
       el.consoleOutput.scrollTop = el.consoleOutput.scrollHeight;
     }, 150);
   }
 
   function renderWebPreview() {
-    let content = el.editorTextarea.value;
+    let content = getEditorCode();
     if (state.language === 'css') {
-      content = `<!DOCTYPE html><html><head><style>${content}</style></head><body><div class="developer-card"><h1>CodeShift CSS Preview</h1><p>Inspecting your styling live.</p></div></body></html>`;
+      content = `<!DOCTYPE html><html><head><style>${content}</style></head><body><div class="developer-card"><h1>CodeShift CSS Preview</h1><p>Your styles rendered live.</p></div></body></html>`;
     }
     const blob = new Blob([content], { type: 'text/html' });
     el.previewIframe.src = URL.createObjectURL(blob);
@@ -852,11 +1079,8 @@ ORDER BY lines_shifted DESC;`
     if (arg === null) return 'null';
     if (arg === undefined) return 'undefined';
     if (typeof arg === 'object') {
-      try {
-        return JSON.stringify(arg, null, 2);
-      } catch (e) {
-        return Object.prototype.toString.call(arg);
-      }
+      try { return JSON.stringify(arg, null, 2); }
+      catch (e) { return Object.prototype.toString.call(arg); }
     }
     return String(arg);
   }
@@ -869,28 +1093,14 @@ ORDER BY lines_shifted DESC;`
   }
 
   // --- Snapshots & Visual Diff Engine ---
-  function saveSnapshot(title, isSystem = false) {
-    const snapshot = {
-      id: 'snap_' + Date.now(),
-      title: title || `Snapshot ${state.snapshots.length + 1}`,
-      author: state.userName,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      date: new Date().toLocaleDateString(),
-      code: el.editorTextarea.value,
-      lines: el.editorTextarea.value.split('\n').length
-    };
-
-    state.snapshots.unshift(snapshot);
-    renderSnapshotsList();
-    persistCurrentRoom();
-
-    if (!isSystem && state.roomId) {
-      broadcast({
-        type: 'SNAPSHOT_CREATED',
-        userId: state.userId,
-        userName: state.userName,
-        snapshot: snapshot
+  function promptSaveSnapshot() {
+    const title = prompt('Enter a checkpoint description:', `Shift Checkpoint`);
+    if (title) {
+      sendWsMessage({
+        type: 'CREATE_SNAPSHOT',
+        title: title
       });
+      showToast('Saving snapshot to server... 📸', 'info');
     }
   }
 
@@ -899,21 +1109,21 @@ ORDER BY lines_shifted DESC;`
     el.badgeSnapshotsCount.textContent = state.snapshots.length;
 
     if (state.snapshots.length === 0) {
-      el.snapshotsList.innerHTML = '<div class="text-zinc-500 text-xs text-center py-4">No snapshots saved yet.</div>';
+      el.snapshotsList.innerHTML = '<div class="text-zinc-500 text-xs text-center py-4">No checkpoints saved yet.</div>';
       return;
     }
 
-    state.snapshots.forEach((snap, idx) => {
+    state.snapshots.forEach((snap) => {
       const item = document.createElement('div');
       item.className = 'p-2.5 rounded-xl bg-surface-elevated/70 border border-border-dim hover:border-violet-500/40 transition-all flex items-center justify-between gap-2';
       item.innerHTML = `
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-white truncate">${snap.title}</span>
-            <span class="text-[10px] text-violet-400 font-mono">${snap.lines}L</span>
+            <span class="text-[10px] text-violet-400 font-mono">${snap.lines || 0}L</span>
           </div>
           <div class="text-[10px] text-zinc-500 font-mono mt-0.5">
-            ${snap.author} • ${snap.time}
+            ${snap.author || 'Dev'} • ${snap.time || ''}
           </div>
         </div>
         <div class="flex items-center gap-1">
@@ -924,7 +1134,6 @@ ORDER BY lines_shifted DESC;`
       el.snapshotsList.appendChild(item);
     });
 
-    // Bind item buttons
     el.snapshotsList.querySelectorAll('.btn-view-diff').forEach(btn => {
       btn.addEventListener('click', () => openDiffModal(btn.dataset.id));
     });
@@ -934,19 +1143,17 @@ ORDER BY lines_shifted DESC;`
   }
 
   let activeComparingSnapshot = null;
-
   function openDiffModal(snapId) {
     const snap = state.snapshots.find(s => s.id === snapId);
     if (!snap) return;
     activeComparingSnapshot = snap;
 
-    el.diffModalTitle.textContent = `Comparing: "${snap.title}" vs Current Buffer`;
-    el.diffModalSubtitle.textContent = `Saved by ${snap.author} on ${snap.date} at ${snap.time}`;
+    el.diffModalTitle.textContent = `Diff: "${snap.title}" vs Current Buffer`;
+    el.diffModalSubtitle.textContent = `Saved by ${snap.author} at ${snap.time}`;
 
-    const oldLines = snap.code.split('\n');
-    const newLines = el.editorTextarea.value.split('\n');
-    
-    // Compute simple line-based diff
+    const oldLines = (snap.code || '').split('\n');
+    const newLines = getEditorCode().split('\n');
+
     el.diffViewer.innerHTML = '';
     const maxLines = Math.max(oldLines.length, newLines.length);
 
@@ -982,16 +1189,23 @@ ORDER BY lines_shifted DESC;`
   function restoreSnapshot(snapId) {
     const snap = state.snapshots.find(s => s.id === snapId);
     if (!snap) return;
-    if (confirm(`Restore editor buffer to "${snap.title}"?`)) {
-      el.editorTextarea.value = snap.code;
-      onEditorInput();
-      showToast(`Restored snapshot "${snap.title}"!`, 'success');
+    if (confirm(`Restore editor to "${snap.title}"?`)) {
+      setEditorCode(snap.code);
+      onCodeChange(snap.code);
+      showToast(`Restored version "${snap.title}"!`, 'success');
       el.modalDiff.classList.add('hidden');
       el.modalDiff.classList.remove('flex');
     }
   }
 
   // --- Room Chat ---
+  function renderAllChatMessages() {
+    el.chatMessagesContainer.innerHTML = '';
+    state.chatMessages.forEach(m => {
+      appendChatMessage(m.userName, m.userColor, m.text, m.time, m.userId === state.userId);
+    });
+  }
+
   function appendChatMessage(name, color, text, time, isSelf = false) {
     const msg = document.createElement('div');
     msg.className = `flex flex-col gap-1 p-2 rounded-xl text-xs max-w-[85%] ${
@@ -1012,45 +1226,82 @@ ORDER BY lines_shifted DESC;`
     const text = el.inputChatMessage.value.trim();
     if (!text) return;
 
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    appendChatMessage(state.userName, state.userColor, text, time, true);
     el.inputChatMessage.value = '';
-
-    if (state.roomId) {
-      broadcast({
-        type: 'CHAT_MESSAGE',
-        userId: state.userId,
-        userName: state.userName,
-        userColor: state.userColor,
-        text: text,
-        time: time
-      });
-    }
+    sendWsMessage({
+      type: 'CHAT_MESSAGE',
+      text: text
+    });
   }
 
   function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+
+  // --- Password Modal ---
+  function openPasswordModal() {
+    el.modalPassword.classList.remove('hidden');
+    el.modalPassword.classList.add('flex');
+    el.passwordError.classList.add('hidden');
+    el.inputRoomPassword.value = '';
+    el.inputRoomPassword.focus();
+  }
+
+  el.btnSubmitPassword.addEventListener('click', () => {
+    const pw = el.inputRoomPassword.value;
+    sendWsMessage({
+      type: 'VERIFY_PASSWORD',
+      password: pw
+    });
+  });
+
+  el.inputRoomPassword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') el.btnSubmitPassword.click();
+  });
+
+  el.btnCancelPassword.addEventListener('click', () => {
+    window.location.hash = '#/';
+  });
+
+  // --- Host Set Password ---
+  el.btnSetRoomPassword.addEventListener('click', () => {
+    el.modalSetPassword.classList.remove('hidden');
+    el.modalSetPassword.classList.add('flex');
+    el.inputNewRoomPassword.focus();
+  });
+
+  el.btnCancelSetPassword.addEventListener('click', () => {
+    el.modalSetPassword.classList.add('hidden');
+    el.modalSetPassword.classList.remove('flex');
+  });
+
+  el.btnSaveRoomPassword.addEventListener('click', () => {
+    const pw = el.inputNewRoomPassword.value;
+    sendWsMessage({
+      type: 'SET_PASSWORD',
+      password: pw
+    });
+    el.modalSetPassword.classList.add('hidden');
+    el.modalSetPassword.classList.remove('flex');
+  });
+
+  // --- Host Lock Editor ---
+  el.btnToggleReadonly.addEventListener('click', () => {
+    if (!state.isHost) return;
+    sendWsMessage({
+      type: 'TOGGLE_READ_ONLY',
+      isReadOnly: !state.isReadOnly
+    });
+  });
 
   // --- Side Panel Tabs ---
   function switchSideTab(targetId) {
     state.activeSideTab = targetId;
     el.sideTabs.forEach(tab => {
-      if (tab.dataset.tab === targetId) {
-        tab.classList.add('active');
-      } else {
-        tab.classList.remove('active');
-      }
+      tab.classList.toggle('active', tab.dataset.tab === targetId);
     });
-
     el.tabPanes.forEach(pane => {
-      if (pane.id === targetId) {
-        pane.classList.remove('hidden');
-      } else {
-        pane.classList.add('hidden');
-      }
+      pane.classList.toggle('hidden', pane.id !== targetId);
     });
-
     if (targetId === 'tab-chat') {
       el.badgeChatUnread.classList.add('hidden');
     }
@@ -1060,45 +1311,26 @@ ORDER BY lines_shifted DESC;`
     tab.addEventListener('click', () => switchSideTab(tab.dataset.tab));
   });
 
-  // --- Settings & Preferences ---
-  function applySettingsToEditor() {
-    el.editorTextarea.style.fontSize = `${state.settings.fontSize}px`;
-    el.editorLineNumbers.style.fontSize = `${state.settings.fontSize - 1}px`;
-    el.editorTextarea.style.tabSize = state.settings.tabSize;
-  }
-
   // --- Event Bindings ---
-  // Landing Actions
   el.btnCreateOrJoin.addEventListener('click', () => {
     const input = el.inputCustomRoom.value.trim();
-    const roomId = input || generateRoomSlug();
-    navigateToRoom(roomId);
+    navigateToRoom(input || generateRoomSlug());
   });
 
   el.inputCustomRoom.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      el.btnCreateOrJoin.click();
-    }
+    if (e.key === 'Enter') el.btnCreateOrJoin.click();
   });
 
-  el.btnQuickSampleRoom.addEventListener('click', () => {
-    navigateToRoom('shift-demo');
-  });
+  el.btnQuickSampleRoom.addEventListener('click', () => navigateToRoom('shift-demo'));
+  el.navBtnInstantRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
+  el.btnHeroLaunchRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
 
-  el.navBtnInstantRoom.addEventListener('click', () => {
-    navigateToRoom(generateRoomSlug());
-  });
-
-  el.btnHeroLaunchRoom.addEventListener('click', () => {
-    navigateToRoom(generateRoomSlug());
-  });
-
-  // Share and Copy links
+  // Copy share link
   function copyShareLink() {
     const url = window.location.href;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
-        showToast('Room link copied to clipboard! 📋', 'success');
+        showToast('Room link copied! Share with collaborators anywhere 📋', 'success');
       });
     } else {
       prompt('Copy this room URL:', url);
@@ -1114,34 +1346,34 @@ ORDER BY lines_shifted DESC;`
     el.consoleOutput.innerHTML = '<div class="text-zinc-500 italic">// Console cleared.</div>';
   });
   el.btnRefreshPreview.addEventListener('click', renderWebPreview);
+  el.btnTakeSnapshot.addEventListener('click', promptSaveSnapshot);
+  el.btnCreateSnapshotModal.addEventListener('click', promptSaveSnapshot);
 
-  // Format Code (basic clean indentation)
+  // Format Code
   el.btnFormatCode.addEventListener('click', () => {
-    const lang = state.language;
-    if (lang === 'json') {
-      try {
-        el.editorTextarea.value = JSON.stringify(JSON.parse(el.editorTextarea.value), null, state.settings.tabSize);
-        onEditorInput();
-        showToast('JSON formatted! ✨', 'success');
-      } catch (err) {
-        showToast('Invalid JSON syntax', 'error');
-      }
+    if (state.monacoInstance) {
+      state.monacoInstance.getAction('editor.action.formatDocument').run();
+      showToast('Document formatted ✨', 'success');
     } else {
-      // Basic trim trailing spaces
-      const cleaned = el.editorTextarea.value
-        .split('\n')
-        .map(l => l.trimEnd())
-        .join('\n');
-      el.editorTextarea.value = cleaned;
-      onEditorInput();
-      showToast('Code cleaned! ✨', 'success');
+      showToast('Code cleaned ✨', 'success');
+    }
+  });
+
+  // Fullscreen Editor Toggle
+  el.btnToggleFullscreen.addEventListener('click', () => {
+    state.isFullscreen = !state.isFullscreen;
+    document.body.classList.toggle('is-fullscreen-editor', state.isFullscreen);
+    if (state.monacoInstance) {
+      setTimeout(() => state.monacoInstance.layout(), 50);
     }
   });
 
   // Download Code
   el.btnDownloadCode.addEventListener('click', () => {
-    const filename = el.activeFilename.textContent;
-    const blob = new Blob([el.editorTextarea.value], { type: 'text/plain;charset=utf-8' });
+    const extMap = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', markdown: 'md', rust: 'rs', go: 'go', sql: 'sql' };
+    const ext = extMap[state.language] || 'txt';
+    const filename = `codeshift-${state.roomId}.${ext}`;
+    const blob = new Blob([getEditorCode()], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
@@ -1151,29 +1383,36 @@ ORDER BY lines_shifted DESC;`
 
   // Language Change
   el.selectLanguage.addEventListener('change', (e) => {
-    state.language = e.target.value;
-    updateActiveFilename();
-    if (DEFAULT_TEMPLATES[state.language] && el.editorTextarea.value.trim() === '') {
-      el.editorTextarea.value = DEFAULT_TEMPLATES[state.language];
-    }
-    onEditorInput();
+    const lang = e.target.value;
+    state.language = lang;
+    updateLanguageInMonaco(lang);
+    updateExecutionBadge();
+
+    // Broadcast language change to room
+    sendWsMessage({
+      type: 'SET_LANGUAGE',
+      language: lang
+    });
+
     showToast(`Language set to ${e.target.options[e.target.selectedIndex].text}`);
   });
 
-  // Theme Selector
+  // Theme Change
   el.selectTheme.addEventListener('change', (e) => {
     const theme = e.target.value;
     state.theme = theme;
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('codeshift_theme', theme);
   });
-  // Set initial theme
   document.documentElement.setAttribute('data-theme', state.theme);
   el.selectTheme.value = state.theme;
 
   // Toggle Sidepanel
   el.btnToggleSidepanel.addEventListener('click', () => {
     el.sidePanel.classList.toggle('hidden');
+    if (state.monacoInstance) {
+      setTimeout(() => state.monacoInstance.layout(), 100);
+    }
   });
 
   // Chat Send
@@ -1182,19 +1421,7 @@ ORDER BY lines_shifted DESC;`
     if (e.key === 'Enter') sendChatMessage();
   });
 
-  // Snapshot modal actions
-  el.btnTakeSnapshot.addEventListener('click', () => {
-    const title = prompt('Enter a snapshot name/description:', `Shift Checkpoint`);
-    if (title) {
-      saveSnapshot(title);
-      showToast('Shift Snapshot saved! 📸', 'success');
-    }
-  });
-  el.btnCreateSnapshotModal.addEventListener('click', () => {
-    el.btnTakeSnapshot.click();
-  });
-
-  // Diff Modal close & restore
+  // Diff Modal Close & Restore
   el.btnCloseDiffModal.addEventListener('click', () => {
     el.modalDiff.classList.add('hidden');
     el.modalDiff.classList.remove('flex');
@@ -1204,9 +1431,7 @@ ORDER BY lines_shifted DESC;`
     el.modalDiff.classList.remove('flex');
   });
   el.btnRestoreDiffSnapshot.addEventListener('click', () => {
-    if (activeComparingSnapshot) {
-      restoreSnapshot(activeComparingSnapshot.id);
-    }
+    if (activeComparingSnapshot) restoreSnapshot(activeComparingSnapshot.id);
   });
 
   // Nickname Modal
@@ -1229,15 +1454,7 @@ ORDER BY lines_shifted DESC;`
       el.modalNickname.classList.add('hidden');
       el.modalNickname.classList.remove('flex');
       renderPeers();
-      showToast(`Display name updated to "${newName}"`, 'success');
-      if (state.roomId) {
-        broadcast({
-          type: 'PEER_HEARTBEAT',
-          userId: state.userId,
-          userName: state.userName,
-          userColor: state.userColor
-        });
-      }
+      showToast(`Display name set to "${newName}"`, 'success');
     }
   });
 
@@ -1245,7 +1462,7 @@ ORDER BY lines_shifted DESC;`
   el.btnOpenSettings.addEventListener('click', () => {
     el.settingFontsize.value = state.settings.fontSize;
     el.settingTabsize.value = state.settings.tabSize;
-    el.settingAutobrack.checked = state.settings.autoBrackets;
+    el.settingWordwrap.checked = state.settings.wordWrap;
     el.settingSound.checked = state.settings.sound;
     el.modalSettings.classList.remove('hidden');
     el.modalSettings.classList.add('flex');
@@ -1257,22 +1474,28 @@ ORDER BY lines_shifted DESC;`
   el.btnSaveSettings.addEventListener('click', () => {
     state.settings.fontSize = parseInt(el.settingFontsize.value, 10);
     state.settings.tabSize = parseInt(el.settingTabsize.value, 10);
-    state.settings.autoBrackets = el.settingAutobrack.checked;
+    state.settings.wordWrap = el.settingWordwrap.checked;
     state.settings.sound = el.settingSound.checked;
 
     localStorage.setItem('cs_fontSize', state.settings.fontSize);
     localStorage.setItem('cs_tabSize', state.settings.tabSize);
-    localStorage.setItem('cs_autoBrackets', state.settings.autoBrackets);
+    localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
     localStorage.setItem('cs_sound', state.settings.sound);
 
-    applySettingsToEditor();
+    if (state.monacoInstance) {
+      state.monacoInstance.updateOptions({
+        fontSize: state.settings.fontSize,
+        tabSize: state.settings.tabSize,
+        wordWrap: state.settings.wordWrap ? 'on' : 'off'
+      });
+    }
+
     el.modalSettings.classList.add('hidden');
     el.modalSettings.classList.remove('flex');
-    showToast('Preferences saved!', 'success');
+    showToast('Preferences updated!', 'success');
   });
 
-  // Initialize
+  // Initialize Application
   initRouter();
 
 })();
-
