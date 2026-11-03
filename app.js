@@ -388,10 +388,12 @@
     const sideLabel = document.getElementById('sidebar-filename');
     const bcFile = document.getElementById('ide-active-filename');
     const engineLabel = document.getElementById('editor-engine-label');
+    const selStatus = document.getElementById('ide-status-lang-select');
     if (tabLabel) tabLabel.textContent = filename;
     if (sideLabel) sideLabel.textContent = filename;
     if (bcFile) bcFile.textContent = filename;
     if (engineLabel) engineLabel.textContent = lang.toUpperCase();
+    if (selStatus && selStatus.value !== lang) selStatus.value = lang;
 
     const sel1 = document.getElementById('ide-language-select');
     const sel2 = document.getElementById('ide-quick-lang-select');
@@ -1187,76 +1189,42 @@
   });
 
   // ── Pro IDE Workspace Controls ──
-  const ideSidebar         = document.getElementById('ide-sidebar');
-  const btnToggleSidebar   = document.getElementById('btn-toggle-sidebar');
-  const btnCollapseSidebar = document.getElementById('btn-collapse-sidebar');
-  const actBtnExplorer     = document.getElementById('act-btn-explorer');
-  const actBtnPeers        = document.getElementById('act-btn-peers');
-  const actBtnSettings     = document.getElementById('act-btn-settings');
-  const btnSidebarCopyLink = document.getElementById('btn-sidebar-copy-link');
-  const btnQuickWrap       = document.getElementById('btn-quick-wrap');
   const btnQuickCopy       = document.getElementById('btn-quick-copy');
-  const langSelect1        = document.getElementById('ide-language-select');
-  const langSelect2        = document.getElementById('ide-quick-lang-select');
+  const langSelectStatus   = document.getElementById('ide-status-lang-select');
 
-  function toggleSidebar() {
-    if (!ideSidebar) return;
-    ideSidebar.classList.toggle('collapsed');
-    const isCollapsed = ideSidebar.classList.contains('collapsed');
-    if (actBtnExplorer) actBtnExplorer.classList.toggle('active', !isCollapsed);
+  // Copy Code Button in Top Bar (Right next to Share)
+  if (btnQuickCopy) {
+    btnQuickCopy.addEventListener('click', () => {
+      const code = getCode();
+      if (!code) {
+        toast('Editor is empty', 'info');
+        return;
+      }
+      navigator.clipboard.writeText(code).then(() => {
+        toast('All code copied to clipboard!', 'success');
+      }).catch(() => {
+        // Fallback copy for legacy browsers
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = code;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          toast('All code copied to clipboard!', 'success');
+        } catch (e) {
+          toast('Failed to copy code', 'error');
+        }
+      });
+    });
   }
 
-  if (btnToggleSidebar)   btnToggleSidebar.addEventListener('click', toggleSidebar);
-  if (btnCollapseSidebar) btnCollapseSidebar.addEventListener('click', toggleSidebar);
-
-  if (actBtnExplorer) actBtnExplorer.addEventListener('click', () => {
-    if (ideSidebar && ideSidebar.classList.contains('collapsed')) {
-      toggleSidebar();
-    }
-  });
-
-  if (actBtnPeers) actBtnPeers.addEventListener('click', () => {
-    if (ideSidebar && ideSidebar.classList.contains('collapsed')) {
-      toggleSidebar();
-    }
-    const peerSec = document.getElementById('sidebar-peer-list');
-    if (peerSec) peerSec.scrollIntoView({ behavior: 'smooth' });
-  });
-
-  if (actBtnSettings) actBtnSettings.addEventListener('click', () => {
-    if (btnOpenSettings) btnOpenSettings.click();
-  });
-
-  if (btnSidebarCopyLink) btnSidebarCopyLink.addEventListener('click', () => copyLink());
-
-  if (btnQuickWrap) btnQuickWrap.addEventListener('click', () => {
-    state.settings.wordWrap = !state.settings.wordWrap;
-    localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
-    if (state.monacoInstance) {
-      state.monacoInstance.updateOptions({ wordWrap: state.settings.wordWrap ? 'on' : 'off' });
-    }
-    toast('Word Wrap ' + (state.settings.wordWrap ? 'Enabled' : 'Disabled'), 'info');
-  });
-
-  if (btnQuickCopy) btnQuickCopy.addEventListener('click', () => {
-    const code = getCode();
-    navigator.clipboard.writeText(code).then(() => {
-      toast('All code copied to clipboard!', 'success');
-    }).catch(() => {
-      toast('Failed to copy', 'error');
-    });
-  });
-
-  if (langSelect1) langSelect1.addEventListener('change', (e) => setEditorLanguage(e.target.value));
-  if (langSelect2) langSelect2.addEventListener('change', (e) => setEditorLanguage(e.target.value));
-
-  // Hotkey Cmd+B / Ctrl+B for Sidebar
-  window.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      toggleSidebar();
-    }
-  });
+  // Syntax switcher in status bar
+  if (langSelectStatus) {
+    langSelectStatus.addEventListener('change', (e) => setEditorLanguage(e.target.value));
+  }
 
   // Modal helpers — guaranteed to open/close cleanly
   function openModal(m) {

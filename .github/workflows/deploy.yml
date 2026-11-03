@@ -30,6 +30,8 @@ jobs:
           cp app.js dist/
           cp styles.css dist/
           cp .nojekyll dist/
+          cp sitemap.xml dist/
+          cp robots.txt dist/
           cp README.md dist/
           cp -r public dist/
 

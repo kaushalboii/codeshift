@@ -6,9 +6,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeShift — Real-Time Collaborative Code Editor</title>
   <meta name="description"
-    content="Instant real-time code sharing. Open a room, paste a URL, code together from anywhere.">
-  <meta property="og:image" content="public/preview.svg">
+    content="CodeShift is an ultra-fast, free, open-source real-time collaborative code editor with VS Code Monaco engine, client-side encryption, and instant zero-login sharing.">
+  <meta name="keywords" content="codeshift, collaborative code editor, real-time code editor, live code share, share code online, monaco editor online, pair programming">
+  <meta name="author" content="Kaushal (kaushalboii)">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://kaushalboii.github.io/codeshift/">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kaushalboii.github.io/codeshift/">
+  <meta property="og:title" content="CodeShift — Real-Time Collaborative Code Editor">
+  <meta property="og:description" content="Instant real-time code sharing with zero login, client-side encryption, and VS Code Monaco editor.">
+  <meta property="og:image" content="https://kaushalboii.github.io/codeshift/public/preview.svg">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CodeShift — Real-Time Collaborative Code Editor">
+  <meta name="twitter:description" content="Instant real-time code sharing with zero login, client-side encryption, and VS Code Monaco editor.">
+  <meta name="twitter:image" content="https://kaushalboii.github.io/codeshift/public/preview.svg">
+
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
+
+  <!-- Structured Data JSON-LD for Google Rich Results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "CodeShift",
+    "url": "https://kaushalboii.github.io/codeshift/",
+    "description": "Fast, free, open-source real-time collaborative code editor with client-side encryption and zero-friction sharing.",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "All",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Kaushal",
+      "url": "https://github.com/kaushalboii"
+    }
+  }
+  </script>
 
   <!-- ============================================================
        SPA PATH RESTORER — runs before everything else.
@@ -38,7 +78,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=2.2">
+  <link rel="stylesheet" href="styles.css?v=2.3">
 
   <style>
     /* ============================================================
@@ -910,360 +950,22 @@
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
     }
 
-    /* WORKSPACE BODY */
+    /* WORKSPACE BODY — FULL SCREEN DISTRACTION-FREE */
     .ide-workspace-body {
       flex: 1;
       width: 100%;
+      height: calc(100vh - 42px - 25px);
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       overflow: hidden;
       position: relative;
-    }
-
-    /* ACTIVITY BAR */
-    .ide-activity-bar {
-      width: 48px;
-      min-width: 48px;
-      height: 100%;
-      background: #0a0a0a;
-      border-right: 1px solid #1a1a1a;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      flex-shrink: 0;
-      z-index: 20;
-      box-sizing: border-box;
-    }
-
-    .act-top, .act-bottom {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .act-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 6px;
-      background: transparent;
-      border: none;
-      color: #666666;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-      transition: all 0.15s ease;
-    }
-
-    .act-btn:hover {
-      color: #ffffff;
-      background: #161616;
-    }
-
-    .act-btn.active {
-      color: #ffffff;
-      background: #1a1a1a;
-      border-left: 2px solid #ffffff;
-      border-radius: 0 6px 6px 0;
-    }
-
-    .act-badge {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      background: #ffffff;
-      color: #000000;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 8.5px;
-      font-weight: 800;
-      border-radius: 10px;
-      padding: 1px 4px;
-      line-height: 1;
-    }
-
-    /* SIDEBAR */
-    .ide-sidebar {
-      width: 240px;
-      min-width: 240px;
-      height: 100%;
-      background: #0d0d0d;
-      border-right: 1px solid #1f1f1f;
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-      transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.2s ease;
-      overflow: hidden;
-      z-index: 15;
-      box-sizing: border-box;
-    }
-
-    .ide-sidebar.collapsed {
-      width: 0 !important;
-      min-width: 0 !important;
-      margin-left: -1px;
-      border-right: none;
-      display: none;
-    }
-
-    .sidebar-header {
-      height: 35px;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #1a1a1a;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #777777;
-      user-select: none;
-    }
-
-    .sidebar-collapse-btn {
-      background: transparent;
-      border: none;
-      color: #555555;
-      cursor: pointer;
-      font-size: 11px;
-      padding: 4px;
-      transition: color 0.15s;
-    }
-
-    .sidebar-collapse-btn:hover { color: #ffffff; }
-
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .sidebar-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .section-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      color: #555555;
-      user-select: none;
-    }
-
-    .file-tree-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 6px 8px;
-      border-radius: 5px;
-      background: #141414;
-      border: 1px solid #222222;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: #ffffff;
-    }
-
-    .file-tree-item.active {
-      border-color: #333333;
-      background: #181818;
-    }
-
-    .file-tag {
-      margin-left: auto;
-      font-size: 9px;
-      font-weight: 700;
-      color: #28c840;
-      background: rgba(40, 200, 64, 0.12);
-      padding: 2px 5px;
-      border-radius: 3px;
-    }
-
-    .ide-select-input {
-      width: 100%;
-      background: #141414;
-      border: 1px solid #2a2a2a;
-      color: #ffffff;
-      padding: 6px 8px;
-      border-radius: 5px;
-      font-size: 11.5px;
-      font-family: 'Inter', sans-serif;
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.15s;
-      box-sizing: border-box;
-    }
-
-    .ide-select-input:hover, .ide-select-input:focus { border-color: #ffffff; }
-
-    .peer-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .peer-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      padding: 5px 8px;
-      border-radius: 4px;
-      background: #111111;
-      font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      color: #cccccc;
-    }
-
-    .peer-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .security-chip {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      background: #111111;
-      border: 1px solid #222222;
-      border-radius: 6px;
-    }
-
-    .sec-icon { font-size: 14px; }
-    .sec-title { font-size: 11px; font-weight: 700; color: #ffffff; }
-    .sec-desc { font-size: 9.5px; color: #777777; }
-
-    .sidebar-btn-action {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      padding: 7px 10px;
-      background: #161616;
-      border: 1px solid #2a2a2a;
-      border-radius: 5px;
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      box-sizing: border-box;
-    }
-
-    .sidebar-btn-action:hover {
-      background: #222222;
-      border-color: #ffffff;
-    }
-
-    /* CENTER WORKBENCH MAIN */
-    .ide-workbench-main {
-      flex: 1;
-      height: 100%;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
       background: #000000;
-      position: relative;
     }
 
-    /* TAB BAR */
-    .ide-tab-bar {
-      height: 36px;
-      min-height: 36px;
-      background: #0a0a0a;
-      border-bottom: 1px solid #1a1a1a;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 12px 0 0;
-      flex-shrink: 0;
-      user-select: none;
-      box-sizing: border-box;
-      z-index: 10;
-    }
-
-    .ide-tab {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 100%;
-      padding: 0 16px;
-      background: #000000;
-      border-right: 1px solid #1a1a1a;
-      border-top: 2px solid #ffffff;
-      color: #ffffff;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: default;
-      box-sizing: border-box;
-    }
-
-    .tab-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: #ffffff;
-      opacity: 0.7;
-    }
-
-    .ide-tab-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tab-quick-select {
-      background: #141414;
-      border: 1px solid #262626;
-      color: #888888;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      outline: none;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .tab-quick-select:hover, .tab-quick-select:focus {
-      border-color: #ffffff;
-      color: #ffffff;
-    }
-
-    .tab-action-btn {
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: #141414;
-      border: 1px solid #262626;
-      color: #888888;
-      font-size: 10.5px;
-      font-family: 'JetBrains Mono', monospace;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .tab-action-btn:hover {
-      background: #222222;
-      border-color: #ffffff;
-      color: #ffffff;
-    }
-
-    /* MONACO VIEWPORT */
+    /* MONACO VIEWPORT (100% Full Width & Height) */
     .ide-editor-container {
-      flex: 1;
       width: 100%;
-      height: calc(100% - 36px);
+      height: 100%;
       position: relative;
       overflow: hidden;
       background: #000000;
@@ -1311,17 +1013,32 @@
     .stat-item.clickable:hover { color: #ffffff; }
     .stat-sep { color: #333333; }
 
+    .status-lang-select {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #888888;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 1px 4px;
+      border-radius: 3px;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .status-lang-select:hover, .status-lang-select:focus {
+      color: #ffffff;
+      border-color: #333333;
+      background: #141414;
+    }
+
+    .status-lang-select option {
+      background: #0d0d0d;
+      color: #ffffff;
+    }
+
     @media (max-width: 768px) {
       .ide-breadcrumbs { display: none; }
-      .ide-sidebar {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 48px;
-        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.85);
-      }
-      .ide-sidebar.collapsed { left: -240px; }
-      .ide-tab-controls .tab-action-btn { display: none; }
       .ide-status-bar .status-right { display: none; }
     }
   </style>
@@ -1490,12 +1207,13 @@
         </div>
 
         <div class="ide-top-right">
-          <!-- Sidebar Toggle (Cmd+B) -->
-          <button id="btn-toggle-sidebar" class="ide-btn-icon" title="Toggle Sidebar (Cmd+B)">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="3"/>
-              <path d="M9 3V21"/>
+          <!-- Copy Code Button (placed next to Share) -->
+          <button id="btn-quick-copy" class="ide-action-btn" title="Copy entire code to clipboard">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
+            <span>Copy Code</span>
           </button>
 
           <!-- Share Room Button -->
@@ -1535,157 +1253,18 @@
         </div>
       </header>
 
-      <!-- MAIN WORKSPACE: LEFT ACTIVITY BAR + SIDEBAR + MONACO VIEWPORT -->
-      <div class="ide-workspace-body">
-
-        <!-- Activity Bar Rail (VS Code left-hand icon strip) -->
-        <aside class="ide-activity-bar">
-          <div class="act-top">
-            <button class="act-btn active" id="act-btn-explorer" title="Explorer / Buffer (Files)">
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-              </svg>
-            </button>
-            <button class="act-btn" id="act-btn-peers" title="Collaborators & Room">
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              <span class="act-badge" id="act-peers-count">1</span>
-            </button>
+      <!-- MAIN WORKSPACE: DISTRACTION-FREE FULL-SCREEN MONACO VIEWPORT -->
+      <main class="ide-workspace-body">
+        <div class="ide-editor-container">
+          <div id="monaco-editor-container"></div>
+          <div id="fallback-editor-wrapper" class="hidden">
+            <div id="editor-line-numbers">1</div>
+            <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Start typing..."></textarea>
           </div>
-          <div class="act-bottom">
-            <button class="act-btn" id="act-btn-settings" title="Settings">
-              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
-          </div>
-        </aside>
+        </div>
+      </main>
 
-        <!-- Collapsible Sidebar Panel -->
-        <aside class="ide-sidebar" id="ide-sidebar">
-          <div class="sidebar-header">
-            <span class="sidebar-title" id="sidebar-title">EXPLORER</span>
-            <button class="sidebar-collapse-btn" id="btn-collapse-sidebar" title="Collapse Sidebar">◀</button>
-          </div>
-
-          <div class="sidebar-content">
-            <!-- Section: ACTIVE BUFFER / FILE -->
-            <div class="sidebar-section">
-              <div class="section-label">ACTIVE FILE</div>
-              <div class="file-tree-item active">
-                <span class="file-icon" id="file-icon-badge">⚡</span>
-                <span class="file-name" id="sidebar-filename">main.ts</span>
-                <span class="file-tag">Live</span>
-              </div>
-            </div>
-
-            <!-- Section: SYNTAX & LANGUAGE (Stops red squiggles!) -->
-            <div class="sidebar-section">
-              <div class="section-label">SYNTAX MODE</div>
-              <select id="ide-language-select" class="ide-select-input" title="Switch syntax highlighting mode">
-                <option value="plaintext">Plain Text (Clean — no squiggles)</option>
-                <option value="typescript" selected>TypeScript (.ts)</option>
-                <option value="javascript">JavaScript (.js)</option>
-                <option value="python">Python (.py)</option>
-                <option value="markdown">Markdown (.md)</option>
-                <option value="html">HTML (.html)</option>
-                <option value="css">CSS (.css)</option>
-                <option value="rust">Rust (.rs)</option>
-                <option value="go">Go (.go)</option>
-                <option value="cpp">C++ (.cpp)</option>
-                <option value="json">JSON (.json)</option>
-                <option value="sql">SQL (.sql)</option>
-              </select>
-            </div>
-
-            <!-- Section: ACTIVE COLLABORATORS (SCREENSHOT 3 style) -->
-            <div class="sidebar-section">
-              <div class="section-label">COLLABORATORS (<span id="sidebar-peer-count">1</span>)</div>
-              <div class="peer-list" id="sidebar-peer-list">
-                <div class="peer-item me">
-                  <span class="peer-dot" style="background:#28c840;"></span>
-                  <span class="peer-name">You (Host)</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Section: ROOM SECURITY & PROTOCOL -->
-            <div class="sidebar-section">
-              <div class="section-label">SECURITY & ENCRYPTION</div>
-              <div class="security-chip">
-                <span class="sec-icon">🔒</span>
-                <div class="sec-info">
-                  <div class="sec-title">AES-GCM 256-bit</div>
-                  <div class="sec-desc">Client-side payload encryption</div>
-                </div>
-              </div>
-              <button id="btn-sidebar-copy-link" class="sidebar-btn-action">
-                <span>🔗</span><span>Copy Invite Link</span>
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <!-- CENTER WORKBENCH (Tabs + Monaco Viewport) -->
-        <main class="ide-workbench-main">
-
-          <!-- VS Code Tab Strip -->
-          <div class="ide-tab-bar">
-            <div class="ide-tab active">
-              <span class="tab-icon" id="tab-icon-badge">⚡</span>
-              <span class="tab-title" id="tab-filename-label">main.ts</span>
-              <span class="tab-dot" id="tab-modified-dot"></span>
-            </div>
-
-            <div class="ide-tab-controls">
-              <!-- Quick Language Switcher Pill in Tab Bar -->
-              <div class="tab-lang-picker" title="Change syntax language">
-                <select id="ide-quick-lang-select" class="tab-quick-select">
-                  <option value="plaintext">Plain Text</option>
-                  <option value="typescript" selected>TypeScript</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="python">Python</option>
-                  <option value="markdown">Markdown</option>
-                  <option value="html">HTML</option>
-                  <option value="css">CSS</option>
-                  <option value="rust">Rust</option>
-                  <option value="go">Go</option>
-                  <option value="cpp">C++</option>
-                  <option value="json">JSON</option>
-                  <option value="sql">SQL</option>
-                </select>
-              </div>
-
-              <!-- Format / Word Wrap Toggle -->
-              <button id="btn-quick-wrap" class="tab-action-btn" title="Toggle Word Wrap">
-                <span>Wrap</span>
-              </button>
-
-              <!-- Copy Code Button -->
-              <button id="btn-quick-copy" class="tab-action-btn" title="Copy entire code to clipboard">
-                <span>Copy Code</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Monaco Container -->
-          <div class="ide-editor-container">
-            <div id="monaco-editor-container"></div>
-            <div id="fallback-editor-wrapper" class="hidden">
-              <div id="editor-line-numbers">1</div>
-              <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Start typing..."></textarea>
-            </div>
-          </div>
-
-        </main>
-      </div>
-
-      <!-- PRO STATUS BAR (Bottom VS Code Telemetry Strip) -->
+      <!-- PRO STATUS BAR (Bottom Telemetry Strip) -->
       <footer class="ide-status-bar">
         <div class="status-left">
           <span class="stat-item clickable" id="cursor-position">Ln 1, Col 1</span>
@@ -1702,7 +1281,20 @@
           <span class="stat-sep">|</span>
           <span class="stat-item">UTF-8</span>
           <span class="stat-sep">|</span>
-          <span class="stat-item clickable" id="editor-engine-label">TypeScript</span>
+          <select id="ide-status-lang-select" class="status-lang-select" title="Switch syntax highlighting mode">
+            <option value="plaintext">Plain Text</option>
+            <option value="typescript" selected>TypeScript</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="markdown">Markdown</option>
+            <option value="html">HTML</option>
+            <option value="css">CSS</option>
+            <option value="rust">Rust</option>
+            <option value="go">Go</option>
+            <option value="cpp">C++</option>
+            <option value="json">JSON</option>
+            <option value="sql">SQL</option>
+          </select>
           <span class="stat-sep">|</span>
           <span class="stat-item">Auto-Save ⚡</span>
         </div>
@@ -1824,7 +1416,7 @@
     <option value="javascript">JavaScript</option>
   </select>
 
-  <script defer src="app.js?v=2.2"></script>
+  <script defer src="app.js?v=2.3"></script>
 </body>
 
 </html>
