@@ -859,72 +859,262 @@
 
     <div id="toast-container"></div>
 
-    <div id="app" style="position:relative;z-index:10;width:100vw;height:100vh;display:flex;flex-direction:column;">
+    <div id="app" class="ide-workbench-root">
 
-      <header class="editor-header">
-        <div class="header-left">
-          <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="Home">
-            <svg class="brand-logo-icon" viewBox="0 0 24 24" width="22" height="22" fill="none">
+      <!-- TOP PRO IDE TITLE & TOOLBAR -->
+      <header class="ide-top-bar">
+        <div class="ide-top-left">
+          <a href="javascript:void(0)" class="ide-brand-logo" id="brand-logo" title="Back to CodeShift Landing">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
               <rect x="2" y="2" width="20" height="20" rx="5" fill="#ffffff"/>
               <path d="M7 8L11 12L7 16" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
               <line x1="13" y1="16" x2="17" y2="16" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
-            <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
+            <span class="ide-brand-name">Code<span class="ide-brand-shift">Shift</span></span>
           </a>
 
-          <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link">
-            <span>🔗</span>
-            <span id="room-nav-id">/room</span>
+          <!-- Breadcrumbs bar -->
+          <div class="ide-breadcrumbs">
+            <span class="bc-root">codeshift</span>
+            <span class="bc-sep">/</span>
+            <span class="bc-item" id="btn-copy-room-link" title="Click to copy room link">
+              <span class="bc-icon">🔗</span>
+              <span id="room-nav-id">/room</span>
+            </span>
+            <span class="bc-sep">/</span>
+            <span class="bc-file" id="ide-active-filename">main.ts</span>
           </div>
-          <div class="save-status-pill" id="save-status-container">
+
+          <!-- Cloud sync status indicator -->
+          <div class="ide-save-pill" id="save-status-container" title="Local + Cloud encrypted synchronization">
             <span class="status-dot saved" id="save-status-dot"></span>
             <span id="save-status-text">Saved</span>
           </div>
         </div>
 
-        <div class="header-center">
-          <div class="online-users-badge" id="online-users-badge">
+        <div class="ide-top-center">
+          <div class="ide-presence-pill" id="online-users-badge">
             <span class="presence-pulse"></span>
             <span id="online-users-count">1 online</span>
           </div>
         </div>
 
-        <div class="header-right">
-          <button id="btn-share-room" class="btn-game-bw" title="Share room URL">
-            <span>🔗</span><span>Share</span>
+        <div class="ide-top-right">
+          <!-- Sidebar Toggle (Cmd+B) -->
+          <button id="btn-toggle-sidebar" class="ide-btn-icon" title="Toggle Sidebar (Cmd+B)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <path d="M9 3V21"/>
+            </svg>
           </button>
-          <button id="btn-create-new-room" class="btn-game-bw" title="Create clean room">
-            <span>➕</span><span>New</span>
+
+          <!-- Share Room Button -->
+          <button id="btn-share-room" class="ide-action-btn ide-action-primary" title="Share room URL">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="18" cy="5" r="3"/>
+              <circle cx="6" cy="12" r="3"/>
+              <circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+            <span>Share</span>
           </button>
-          <button id="btn-download-code" class="btn-game-bw" title="Export file">
-            <span>⬇️</span><span>Export</span>
+
+          <!-- New Room Button -->
+          <button id="btn-create-new-room" class="ide-action-btn" title="Create clean room">
+            <span>+</span><span>New</span>
           </button>
-          <button id="btn-open-settings" class="btn-game-bw btn-game-icon" title="Preferences">
-            <span>⚙️</span>
+
+          <!-- Export Button -->
+          <button id="btn-download-code" class="ide-action-btn" title="Export file">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Export</span>
+          </button>
+
+          <!-- Settings Button -->
+          <button id="btn-open-settings" class="ide-btn-icon" title="Editor Preferences">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
           </button>
         </div>
       </header>
 
-      <main class="editor-viewport-wrapper">
-        <div id="monaco-editor-container"></div>
-        <div id="fallback-editor-wrapper" class="hidden">
-          <div id="editor-line-numbers">1</div>
-          <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Start typing..."></textarea>
-        </div>
-      </main>
+      <!-- MAIN WORKSPACE: LEFT ACTIVITY BAR + SIDEBAR + MONACO VIEWPORT -->
+      <div class="ide-workspace-body">
 
-      <footer class="editor-status-bar">
+        <!-- Activity Bar Rail (VS Code left-hand icon strip) -->
+        <aside class="ide-activity-bar">
+          <div class="act-top">
+            <button class="act-btn active" id="act-btn-explorer" title="Explorer / Buffer (Files)">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+            <button class="act-btn" id="act-btn-peers" title="Collaborators & Room">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <span class="act-badge" id="act-peers-count">1</span>
+            </button>
+          </div>
+          <div class="act-bottom">
+            <button class="act-btn" id="act-btn-settings" title="Settings">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Collapsible Sidebar Panel -->
+        <aside class="ide-sidebar" id="ide-sidebar">
+          <div class="sidebar-header">
+            <span class="sidebar-title" id="sidebar-title">EXPLORER</span>
+            <button class="sidebar-collapse-btn" id="btn-collapse-sidebar" title="Collapse Sidebar">◀</button>
+          </div>
+
+          <div class="sidebar-content">
+            <!-- Section: ACTIVE BUFFER / FILE -->
+            <div class="sidebar-section">
+              <div class="section-label">ACTIVE FILE</div>
+              <div class="file-tree-item active">
+                <span class="file-icon" id="file-icon-badge">⚡</span>
+                <span class="file-name" id="sidebar-filename">main.ts</span>
+                <span class="file-tag">Live</span>
+              </div>
+            </div>
+
+            <!-- Section: SYNTAX & LANGUAGE (Stops red squiggles!) -->
+            <div class="sidebar-section">
+              <div class="section-label">SYNTAX MODE</div>
+              <select id="ide-language-select" class="ide-select-input" title="Switch syntax highlighting mode">
+                <option value="plaintext">Plain Text (Clean — no squiggles)</option>
+                <option value="typescript" selected>TypeScript (.ts)</option>
+                <option value="javascript">JavaScript (.js)</option>
+                <option value="python">Python (.py)</option>
+                <option value="markdown">Markdown (.md)</option>
+                <option value="html">HTML (.html)</option>
+                <option value="css">CSS (.css)</option>
+                <option value="rust">Rust (.rs)</option>
+                <option value="go">Go (.go)</option>
+                <option value="cpp">C++ (.cpp)</option>
+                <option value="json">JSON (.json)</option>
+                <option value="sql">SQL (.sql)</option>
+              </select>
+            </div>
+
+            <!-- Section: ACTIVE COLLABORATORS (SCREENSHOT 3 style) -->
+            <div class="sidebar-section">
+              <div class="section-label">COLLABORATORS (<span id="sidebar-peer-count">1</span>)</div>
+              <div class="peer-list" id="sidebar-peer-list">
+                <div class="peer-item me">
+                  <span class="peer-dot" style="background:#28c840;"></span>
+                  <span class="peer-name">You (Host)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section: ROOM SECURITY & PROTOCOL -->
+            <div class="sidebar-section">
+              <div class="section-label">SECURITY & ENCRYPTION</div>
+              <div class="security-chip">
+                <span class="sec-icon">🔒</span>
+                <div class="sec-info">
+                  <div class="sec-title">AES-GCM 256-bit</div>
+                  <div class="sec-desc">Client-side payload encryption</div>
+                </div>
+              </div>
+              <button id="btn-sidebar-copy-link" class="sidebar-btn-action">
+                <span>🔗</span><span>Copy Invite Link</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- CENTER WORKBENCH (Tabs + Monaco Viewport) -->
+        <main class="ide-workbench-main">
+
+          <!-- VS Code Tab Strip -->
+          <div class="ide-tab-bar">
+            <div class="ide-tab active">
+              <span class="tab-icon" id="tab-icon-badge">⚡</span>
+              <span class="tab-title" id="tab-filename-label">main.ts</span>
+              <span class="tab-dot" id="tab-modified-dot"></span>
+            </div>
+
+            <div class="ide-tab-controls">
+              <!-- Quick Language Switcher Pill in Tab Bar -->
+              <div class="tab-lang-picker" title="Change syntax language">
+                <select id="ide-quick-lang-select" class="tab-quick-select">
+                  <option value="plaintext">Plain Text</option>
+                  <option value="typescript" selected>TypeScript</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="python">Python</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="html">HTML</option>
+                  <option value="css">CSS</option>
+                  <option value="rust">Rust</option>
+                  <option value="go">Go</option>
+                  <option value="cpp">C++</option>
+                  <option value="json">JSON</option>
+                  <option value="sql">SQL</option>
+                </select>
+              </div>
+
+              <!-- Format / Word Wrap Toggle -->
+              <button id="btn-quick-wrap" class="tab-action-btn" title="Toggle Word Wrap">
+                <span>Wrap</span>
+              </button>
+
+              <!-- Copy Code Button -->
+              <button id="btn-quick-copy" class="tab-action-btn" title="Copy entire code to clipboard">
+                <span>Copy Code</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Monaco Container -->
+          <div class="ide-editor-container">
+            <div id="monaco-editor-container"></div>
+            <div id="fallback-editor-wrapper" class="hidden">
+              <div id="editor-line-numbers">1</div>
+              <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Start typing..."></textarea>
+            </div>
+          </div>
+
+        </main>
+      </div>
+
+      <!-- PRO STATUS BAR (Bottom VS Code Telemetry Strip) -->
+      <footer class="ide-status-bar">
         <div class="status-left">
-          <span id="cursor-position">Ln 1, Col 1</span>
-          <span>•</span>
-          <span id="code-stats">0 lines</span>
-          <span>•</span>
-          <span id="sync-status">Real-Time Sync Active (Encrypted)</span>
+          <span class="stat-item clickable" id="cursor-position">Ln 1, Col 1</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item" id="code-stats">0 lines</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item" id="code-chars-count">0 chars</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item" id="sync-status">🔒 Real-Time Sync (Encrypted)</span>
         </div>
+
         <div class="status-right">
-          <span id="editor-engine-label">Monaco Editor (VS Code)</span>
-          <span>•</span>
-          <span>Auto-Save ⚡</span>
+          <span class="stat-item" id="status-spaces-label">Spaces: 2</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item">UTF-8</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item clickable" id="editor-engine-label">TypeScript</span>
+          <span class="stat-sep">|</span>
+          <span class="stat-item">Auto-Save ⚡</span>
         </div>
       </footer>
 

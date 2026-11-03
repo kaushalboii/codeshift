@@ -351,6 +351,9 @@
     if (el.roomNavId) el.roomNavId.textContent = '/' + roomId;
     document.title = 'CodeShift · /' + roomId;
 
+    const savedLang = localStorage.getItem('codeshift_lang_' + roomId) || 'typescript';
+    setEditorLanguage(savedLang);
+
     const cached = localStorage.getItem('codeshift_code_' + roomId);
     const initial = cached !== null ? cached : '';
 
@@ -358,6 +361,39 @@
     syncSetup(roomId);
     presenceStart(roomId);
     setSaveStatus('saved');
+  }
+
+  function setEditorLanguage(lang) {
+    state.language = lang;
+    if (state.roomId) {
+      localStorage.setItem('codeshift_lang_' + state.roomId, lang);
+    }
+    if (state.monacoInstance) {
+      const model = state.monacoInstance.getModel();
+      if (model && window.monaco) {
+        monaco.editor.setModelLanguage(model, lang);
+      }
+    }
+    const extMap = {
+      typescript: 'ts', javascript: 'js', python: 'py', plaintext: 'txt',
+      markdown: 'md', html: 'html', css: 'css', rust: 'rs', go: 'go',
+      cpp: 'cpp', json: 'json', sql: 'sql'
+    };
+    const ext = extMap[lang] || 'txt';
+    const filename = (state.roomId || 'main') + '.' + ext;
+    const tabLabel = document.getElementById('tab-filename-label');
+    const sideLabel = document.getElementById('sidebar-filename');
+    const bcFile = document.getElementById('ide-active-filename');
+    const engineLabel = document.getElementById('editor-engine-label');
+    if (tabLabel) tabLabel.textContent = filename;
+    if (sideLabel) sideLabel.textContent = filename;
+    if (bcFile) bcFile.textContent = filename;
+    if (engineLabel) engineLabel.textContent = lang.toUpperCase();
+
+    const sel1 = document.getElementById('ide-language-select');
+    const sel2 = document.getElementById('ide-quick-lang-select');
+    if (sel1 && sel1.value !== lang) sel1.value = lang;
+    if (sel2 && sel2.value !== lang) sel2.value = lang;
   }
 
   // ──────────────────────────────────────────────
@@ -397,10 +433,25 @@
       defineTheme();
       if (el.monacoContainer) el.monacoContainer.innerHTML = '';
 
+      // Disable semantic error squiggles for clean note-taking & code writing
+      if (window.monaco && monaco.languages && monaco.languages.typescript) {
+        try {
+          monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+            noSemanticValidation: true,
+            noSyntaxValidation: false
+          });
+          monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+            noSemanticValidation: true,
+            noSyntaxValidation: false
+          });
+        } catch (_) {}
+      }
+
       const isMobile = window.innerWidth < 768;
+      const initialLang = state.language || 'typescript';
       state.monacoInstance = monaco.editor.create(el.monacoContainer, {
         value: initial,
-        language: 'typescript', // Typescript syntax with coding colors
+        language: initialLang,
         theme: 'codeshift-dark',
         automaticLayout: true,
         fontSize: isMobile ? Math.min(13, state.settings.fontSize) : state.settings.fontSize,
@@ -420,12 +471,7 @@
         tabSize: state.settings.tabSize,
         wordWrap: state.settings.wordWrap ? 'on' : 'off',
 
-        // ── Autocomplete / Suggestions / Recommendations ──
-        // (Commented out per user request to disable recommendation popups when typing)
-        // quickSuggestions: true,
-        // suggestOnTriggerCharacters: true,
-        // wordBasedSuggestions: true,
-        // snippetSuggestions: 'inline',
+        // ── Autocomplete / Suggestions ──
         quickSuggestions: false,
         suggestOnTriggerCharacters: false,
         acceptSuggestionOnEnter: 'off',
@@ -442,18 +488,25 @@
       });
 
       if (el.fallbackWrapper) el.fallbackWrapper.classList.add('hidden');
-      if (el.editorLabel) el.editorLabel.textContent = 'Monaco (VS Code)';
+      if (el.editorLabel) el.editorLabel.textContent = (initialLang || 'typescript').toUpperCase();
 
       state.monacoInstance.onDidChangeModelContent(() => {
         if (state.isApplyingRemote) return;
-        onLocalChange(state.monacoInstance.getValue());
+        const val = state.monacoInstance.getValue();
+        const charsEl = document.getElementById('code-chars-count');
+        if (charsEl) charsEl.textContent = val.length + ' ' + (val.length === 1 ? 'char' : 'chars');
+        onLocalChange(val);
       });
 
       state.monacoInstance.onDidChangeCursorPosition((e) => {
         const p = e.position;
-        const lines = state.monacoInstance.getModel().getLineCount();
+        const model = state.monacoInstance.getModel();
+        const lines = model ? model.getLineCount() : 1;
+        const chars = model ? model.getValueLength() : 0;
         if (el.cursorPos) el.cursorPos.textContent = 'Ln ' + p.lineNumber + ', Col ' + p.column;
         if (el.codeStats) el.codeStats.textContent = lines + ' ' + (lines === 1 ? 'line' : 'lines');
+        const charsEl = document.getElementById('code-chars-count');
+        if (charsEl) charsEl.textContent = chars + ' ' + (chars === 1 ? 'char' : 'chars');
         broadcastCursor(p.lineNumber, p.column);
       });
 
@@ -799,20 +852,23 @@
     fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence.json')
       .then(r => r.json())
       .then(map => {
-        if (!map) { setOnline(1); return; }
+        if (!map) { setOnline(1, []); return; }
         const now = Date.now();
         const activeEntries = Object.entries(map).filter(([uid, v]) => v && (now - v.ts) < 20000);
-        setOnline(Math.max(1, activeEntries.length));
 
         // Render collaborative cursors for active remote users (Screenshot 3 style)
         const activeUids = new Set();
+        const peers = [];
         activeEntries.forEach(([uid, data]) => {
           if (uid === state.userId) return;
+          peers.push(data);
           activeUids.add(uid);
           if (data && data.line) {
             renderRemoteCursor(uid, data.name || 'Anonymous', data.color || '#10b981', data.line, data.col || 1);
           }
         });
+
+        setOnline(Math.max(1, activeEntries.length), peers);
 
         // Clean up cursors for disconnected peers
         Object.keys(remoteCursors).forEach(uid => {
@@ -821,11 +877,35 @@
           }
         });
       })
-      .catch(() => setOnline(1));
+      .catch(() => setOnline(1, []));
   }
 
-  function setOnline(n) {
+  function setOnline(n, peerList = []) {
     if (el.onlineCount) el.onlineCount.textContent = n + ' online';
+    const peerCountEl = document.getElementById('sidebar-peer-count');
+    const actBadgeEl = document.getElementById('act-peers-count');
+    if (peerCountEl) peerCountEl.textContent = n;
+    if (actBadgeEl) actBadgeEl.textContent = n;
+
+    const list = document.getElementById('sidebar-peer-list');
+    if (list) {
+      let html = `
+        <div class="peer-item me">
+          <span class="peer-dot" style="background:#28c840;"></span>
+          <span class="peer-name">You (Host)</span>
+        </div>
+      `;
+      peerList.forEach(p => {
+        const lineInfo = p.line ? ` (Line ${p.line})` : '';
+        html += `
+          <div class="peer-item">
+            <span class="peer-dot" style="background:${p.color || '#10b981'};"></span>
+            <span class="peer-name">${escapeHtml(p.name || 'Anonymous')}${lineInfo}</span>
+          </div>
+        `;
+      });
+      list.innerHTML = html;
+    }
   }
 
   // ──────────────────────────────────────────────
@@ -1089,12 +1169,90 @@
 
   if (btnDownload) btnDownload.addEventListener('click', () => {
     const code = getCode();
-    const fname = (state.roomId || 'codeshift') + '.txt';
+    const extMap = {
+      typescript: 'ts', javascript: 'js', python: 'py', plaintext: 'txt',
+      markdown: 'md', html: 'html', css: 'css', rust: 'rs', go: 'go',
+      cpp: 'cpp', json: 'json', sql: 'sql'
+    };
+    const ext = extMap[state.language] || 'txt';
+    const fname = (state.roomId || 'codeshift') + '.' + ext;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' }));
     a.download = fname;
     a.click();
     toast('Downloaded ' + fname, 'success');
+  });
+
+  // ── Pro IDE Workspace Controls ──
+  const ideSidebar         = document.getElementById('ide-sidebar');
+  const btnToggleSidebar   = document.getElementById('btn-toggle-sidebar');
+  const btnCollapseSidebar = document.getElementById('btn-collapse-sidebar');
+  const actBtnExplorer     = document.getElementById('act-btn-explorer');
+  const actBtnPeers        = document.getElementById('act-btn-peers');
+  const actBtnSettings     = document.getElementById('act-btn-settings');
+  const btnSidebarCopyLink = document.getElementById('btn-sidebar-copy-link');
+  const btnQuickWrap       = document.getElementById('btn-quick-wrap');
+  const btnQuickCopy       = document.getElementById('btn-quick-copy');
+  const langSelect1        = document.getElementById('ide-language-select');
+  const langSelect2        = document.getElementById('ide-quick-lang-select');
+
+  function toggleSidebar() {
+    if (!ideSidebar) return;
+    ideSidebar.classList.toggle('collapsed');
+    const isCollapsed = ideSidebar.classList.contains('collapsed');
+    if (actBtnExplorer) actBtnExplorer.classList.toggle('active', !isCollapsed);
+  }
+
+  if (btnToggleSidebar)   btnToggleSidebar.addEventListener('click', toggleSidebar);
+  if (btnCollapseSidebar) btnCollapseSidebar.addEventListener('click', toggleSidebar);
+
+  if (actBtnExplorer) actBtnExplorer.addEventListener('click', () => {
+    if (ideSidebar && ideSidebar.classList.contains('collapsed')) {
+      toggleSidebar();
+    }
+  });
+
+  if (actBtnPeers) actBtnPeers.addEventListener('click', () => {
+    if (ideSidebar && ideSidebar.classList.contains('collapsed')) {
+      toggleSidebar();
+    }
+    const peerSec = document.getElementById('sidebar-peer-list');
+    if (peerSec) peerSec.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  if (actBtnSettings) actBtnSettings.addEventListener('click', () => {
+    if (btnOpenSettings) btnOpenSettings.click();
+  });
+
+  if (btnSidebarCopyLink) btnSidebarCopyLink.addEventListener('click', () => copyLink());
+
+  if (btnQuickWrap) btnQuickWrap.addEventListener('click', () => {
+    state.settings.wordWrap = !state.settings.wordWrap;
+    localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
+    if (state.monacoInstance) {
+      state.monacoInstance.updateOptions({ wordWrap: state.settings.wordWrap ? 'on' : 'off' });
+    }
+    toast('Word Wrap ' + (state.settings.wordWrap ? 'Enabled' : 'Disabled'), 'info');
+  });
+
+  if (btnQuickCopy) btnQuickCopy.addEventListener('click', () => {
+    const code = getCode();
+    navigator.clipboard.writeText(code).then(() => {
+      toast('All code copied to clipboard!', 'success');
+    }).catch(() => {
+      toast('Failed to copy', 'error');
+    });
+  });
+
+  if (langSelect1) langSelect1.addEventListener('change', (e) => setEditorLanguage(e.target.value));
+  if (langSelect2) langSelect2.addEventListener('change', (e) => setEditorLanguage(e.target.value));
+
+  // Hotkey Cmd+B / Ctrl+B for Sidebar
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleSidebar();
+    }
   });
 
   // Modal helpers — guaranteed to open/close cleanly
