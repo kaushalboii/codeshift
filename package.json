@@ -1,21 +1,20 @@
 {
   "name": "codeshift",
-  "version": "1.0.0",
-  "description": "CodeShift — Real-Time Collaborative Code Editor. Think together. Code without limits.",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "CodeShift — Real-Time Collaborative Code Sharing. Zero logins, zero tracking, client-encrypted storage.",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "npx serve -l 3000 .",
+    "dev": "npx serve -l 3000 ."
   },
   "keywords": [
     "codeshift",
-    "codeshare",
     "collaborative-coding",
     "real-time",
     "code-editor",
+    "monaco-editor",
+    "client-encryption",
     "developer-tools"
   ],
   "author": "Kaushal",
   "license": "MIT"
 }
-

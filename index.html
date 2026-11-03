@@ -482,72 +482,12 @@
       }
     }
 
-    /* Open Source Value Badges Strip */
-    .oss-badges-strip {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      max-width: 680px;
-      width: 100%;
-      margin-top: 20px;
-      margin-bottom: 8px;
-    }
-    .oss-badge-item {
-      background: rgba(8, 25, 33, 0.65);
-      border: 1px solid rgba(124, 226, 238, 0.16);
-      border-radius: 10px;
-      padding: 12px 14px;
-      text-align: left;
-      backdrop-filter: blur(12px);
-      transition: all 0.2s ease;
-    }
-    .oss-badge-item:hover {
-      border-color: rgba(124, 226, 238, 0.35);
-      background: rgba(10, 32, 42, 0.85);
-      transform: translateY(-2px);
-    }
-    .oss-badge-icon {
-      font-size: 16px;
-      display: block;
-      margin-bottom: 4px;
-    }
-    .oss-badge-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: #e0f6f8;
-      display: block;
-      margin-bottom: 2px;
-    }
-    .oss-badge-sub {
-      font-size: 10.5px;
-      color: #7a9da9;
-      display: block;
-      line-height: 1.35;
-    }
-
-    @media (max-width: 768px) {
-      .oss-badges-strip {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-      }
-      .nav-oss-pill {
-        display: none;
-      }
-    }
-    @media (max-width: 480px) {
-      .oss-badges-strip {
-        grid-template-columns: 1fr;
-        gap: 6px;
-      }
-    }
-
-    /* Landing footer - Open Source & Developer Pattern */
+    /* Landing footer - Minimal Black & White Monochrome Style */
     .landing-footer {
       position: relative;
       z-index: 20;
-      border-top: 1px solid rgba(124, 226, 238, 0.14);
-      background: rgba(3, 14, 18, 0.85);
-      backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      background: #000000;
       padding: 24px 32px;
     }
     .footer-container {
@@ -556,13 +496,13 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
+      gap: 24px;
       flex-wrap: wrap;
     }
     .footer-col-brand {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
     }
     .footer-brand-header {
       display: flex;
@@ -572,22 +512,28 @@
     .footer-brand-title {
       font-size: 16px;
       font-weight: 800;
-      color: #f0fbfd;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+    .footer-brand-shift {
+      color: #ffffff;
+      font-weight: 800;
     }
     .footer-tag-pill {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #4ecdc4;
-      background: rgba(78, 205, 196, 0.12);
-      border: 1px solid rgba(78, 205, 196, 0.28);
-      border-radius: 100px;
-      padding: 2px 8px;
+      color: #ffffff;
+      background: #111111;
+      border: 1px solid #333333;
+      border-radius: 4px;
+      padding: 2px 7px;
     }
     .footer-desc {
       font-size: 12px;
-      color: #7195a2;
+      color: #888888;
       max-width: 360px;
       line-height: 1.5;
     }
@@ -595,24 +541,26 @@
       text-align: center;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
     }
     .footer-dev-line {
       font-size: 12.5px;
-      color: #b0d8e2;
+      color: #cccccc;
+      letter-spacing: 0.01em;
     }
     .footer-dev-line strong {
-      color: #7ce2ee;
+      color: #ffffff;
       font-weight: 700;
     }
     .footer-dev-sub {
       font-size: 11px;
-      color: #557985;
+      color: #666666;
     }
     .footer-col-links {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
     .footer-link-btn {
       display: inline-flex;
@@ -620,30 +568,101 @@
       gap: 6px;
       font-size: 12px;
       font-weight: 700;
-      color: #f0fbfd;
-      background: rgba(20, 60, 72, 0.7);
-      border: 1px solid rgba(124, 226, 238, 0.32);
-      border-radius: 8px;
-      padding: 7px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #ffffff;
+      background: #000000;
+      border: 1px solid #ffffff;
+      border-radius: 6px;
+      padding: 6px 14px;
       text-decoration: none;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
+      cursor: pointer;
     }
     .footer-link-btn:hover {
-      background: rgba(30, 90, 105, 0.9);
-      border-color: #7ce2ee;
+      background: #ffffff;
+      color: #000000;
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
       transform: translateY(-1px);
     }
     .footer-link-sub {
       font-size: 12px;
-      color: #7aa1ae;
+      font-weight: 500;
+      color: #888888;
       text-decoration: none;
       transition: color 0.15s;
     }
+    .footer-btn-link {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-family: inherit;
+    }
     .footer-link-sub:hover {
-      color: #7ce2ee;
+      color: #ffffff;
+      text-decoration: underline;
     }
     .footer-link-dot {
-      color: #3b5f6d;
+      color: #333333;
+    }
+
+    /* Modal Privacy styling - Sleek Monochrome B&W */
+    .modal-privacy-card {
+      max-width: 580px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95);
+    }
+    .privacy-pill-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #000000;
+      background: #ffffff;
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+    .modal-privacy-body {
+      overflow-y: auto;
+      max-height: 58vh;
+      padding: 18px 20px;
+    }
+    .privacy-section-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .privacy-section-item {
+      background: #111111;
+      border: 1px solid #222222;
+      border-radius: 6px;
+      padding: 12px 14px;
+      transition: border-color 0.15s;
+    }
+    .privacy-section-item:hover {
+      border-color: #444444;
+    }
+    .privacy-sec-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .privacy-sec-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: #999999;
     }
 
     @media (max-width: 768px) {
@@ -732,7 +751,7 @@
 
       <!-- Room input - Primary CTA front and center -->
       <div class="room-form">
-        <span class="room-prefix">codeshift.io/</span>
+        <span class="room-prefix" id="room-prefix-label">codeshift/#/</span>
         <input id="landing-room-input" class="room-input" type="text" placeholder="your-room-name" maxlength="64"
           autocomplete="off" spellcheck="false">
         <button id="landing-open-btn" class="room-go-btn">Open →</button>
@@ -746,36 +765,12 @@
           <div class="code-dot y"></div>
           <div class="code-dot g"></div>
         </div>
-        <div class="code-line"><span class="t-cmt">// codeshift.io/your-room · synced in real-time</span></div>
+        <div class="code-line"><span class="t-cmt" id="code-card-comment">// codeshift/#/your-room · synced in real-time</span></div>
         <div class="code-line"><span class="t-kw">async function</span> <span class="t-fn">collaborate</span><span class="t-p">(</span><span class="t-fn">roomId</span><span class="t-p">) {</span></div>
         <div class="code-line">  <span class="t-kw">const</span> session <span class="t-p">=</span> <span class="t-kw">await</span> CodeShift<span class="t-p">.</span><span class="t-fn">join</span><span class="t-p">(</span>roomId<span class="t-p">);</span></div>
         <div class="code-line">  session<span class="t-p">.</span><span class="t-fn">onCode</span><span class="t-p">(</span>code <span class="t-p">=&gt;</span> <span class="t-fn">sync</span><span class="t-p">(</span>code<span class="t-p">));</span></div>
         <div class="code-line">  <span class="t-kw">return</span> <span class="t-str">"collab ready ✓"</span><span class="t-p">;</span></div>
         <div class="code-line"><span class="t-p">}</span><span class="t-cursor"></span></div>
-      </div>
-
-      <!-- Open Source Value Badges Strip -->
-      <div class="oss-badges-strip">
-        <div class="oss-badge-item">
-          <span class="oss-badge-icon">⚡</span>
-          <span class="oss-badge-title">Instant Peer Sync</span>
-          <span class="oss-badge-sub">Real-time room collaboration with Monaco editor</span>
-        </div>
-        <div class="oss-badge-item">
-          <span class="oss-badge-icon">🔒</span>
-          <span class="oss-badge-title">Client-Encrypted</span>
-          <span class="oss-badge-sub">Payloads compressed & encrypted on your device</span>
-        </div>
-        <div class="oss-badge-item">
-          <span class="oss-badge-icon">🚀</span>
-          <span class="oss-badge-title">Zero Login Friction</span>
-          <span class="oss-badge-sub">No email, no password — instant anonymous rooms</span>
-        </div>
-        <div class="oss-badge-item">
-          <span class="oss-badge-icon">💖</span>
-          <span class="oss-badge-title">100% Open Source</span>
-          <span class="oss-badge-sub">Free software under the MIT License for all</span>
-        </div>
       </div>
     </div>
 
@@ -784,18 +779,18 @@
         <div class="footer-col-brand">
           <div class="footer-brand-header">
             <svg viewBox="0 0 36 36" width="20" height="20" fill="none">
-              <path d="M10 9L4 18L10 27" stroke="#7ce2ee" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M26 9L32 18L26 27" stroke="#7ce2ee" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#4ecdc4" />
+              <path d="M10 9L4 18L10 27" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M26 9L32 18L26 27" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#ffffff" />
             </svg>
-            <span class="footer-brand-title">Code<span class="landing-brand-shift">Shift</span></span>
+            <span class="footer-brand-title">Code<span class="footer-brand-shift">Shift</span></span>
             <span class="footer-tag-pill">v2.0 · Open Source</span>
           </div>
           <p class="footer-desc">Real-time collaborative code sharing. Zero logins, zero tracking, client-encrypted storage.</p>
         </div>
 
         <div class="footer-col-dev">
-          <div class="footer-dev-line">Developed & maintained with ❤️ by <strong>Kaushal</strong></div>
+          <div class="footer-dev-line">Developed & maintained with 🤍 by <strong>Kaushal</strong></div>
           <div class="footer-dev-sub">Free and open source for developers worldwide under the MIT License.</div>
         </div>
 
@@ -806,6 +801,8 @@
             </svg>
             <span>GitHub</span>
           </a>
+          <button id="btn-open-privacy" class="footer-link-sub footer-btn-link" type="button">Privacy Policy</button>
+          <span class="footer-link-dot">·</span>
           <a href="https://github.com/kaushalboii/codeshift/issues" target="_blank" rel="noopener" class="footer-link-sub">Issues</a>
           <span class="footer-link-dot">·</span>
           <a href="https://github.com/kaushalboii/codeshift/blob/main/README.md" target="_blank" rel="noopener" class="footer-link-sub">Docs</a>
@@ -954,6 +951,54 @@
       </div>
       <div class="modal-footer">
         <button id="btn-modal-done-share" class="btn-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy Policy Modal (Zero Knowledge, Client-Encrypted) -->
+  <div id="modal-privacy" class="modal-backdrop hidden">
+    <div class="modal-card modal-privacy-card">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <h3 class="modal-title">Privacy Policy</h3>
+          <span class="privacy-pill-tag">Zero Knowledge</span>
+        </div>
+        <button id="btn-close-privacy" class="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-content modal-privacy-body">
+        <p class="modal-description" style="color:#ffffff;font-size:13px;font-weight:600;margin-bottom:6px;">
+          CodeShift is engineered with privacy as an absolute guarantee.
+        </p>
+        <p class="modal-description" style="margin-bottom:14px;color:#888888;font-size:12px;">
+          Real-time collaborative editing should be frictionless, anonymous, and unmonitored.
+        </p>
+
+        <div class="privacy-section-list">
+          <div class="privacy-section-item">
+            <div class="privacy-sec-title">1. No Accounts & Zero Logins</div>
+            <div class="privacy-sec-text">We never require or collect your name, email address, password, or profile information. Sessions are pseudonymized and completely frictionless.</div>
+          </div>
+          <div class="privacy-section-item">
+            <div class="privacy-sec-title">2. Zero Tracking & No Analytics</div>
+            <div class="privacy-sec-text">We do not use Google Analytics, tracking pixels, persistent advertising cookies, or browser fingerprinting. Your browsing activity is never monitored.</div>
+          </div>
+          <div class="privacy-section-item">
+            <div class="privacy-sec-title">3. Client-Side Encryption & Compression</div>
+            <div class="privacy-sec-text">All code editor payloads are compressed using LZW and encrypted on your device before synchronization. The cloud database only stores ciphertext.</div>
+          </div>
+          <div class="privacy-section-item">
+            <div class="privacy-sec-title">4. Private Room Access</div>
+            <div class="privacy-sec-text">Rooms are accessible exclusively through your unique room URL. Only individuals with whom you choose to share your room link can view or collaborate.</div>
+          </div>
+          <div class="privacy-section-item">
+            <div class="privacy-sec-title">5. 100% Free & Open Source (MIT)</div>
+            <div class="privacy-sec-text">CodeShift's full source code is public and auditable on GitHub under the MIT License. Anyone can review security implementations or host a private instance.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#888888;font-family:'JetBrains Mono',monospace;">CodeShift v2.0 · MIT License</span>
+        <button id="btn-done-privacy" class="btn-game-bw" style="font-size:12px;padding:6px 14px;">[ Close ]</button>
       </div>
     </div>
   </div>

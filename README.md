@@ -1,93 +1,168 @@
-# ⚡ CodeShare — Instant Real-Time Code Sharing
+# ⚡ CodeShift — Real-Time Collaborative Code Sharing
 
-> *"Simple, seamless code sharing with live auto-save and multi-device sync — no signup or login required."*
+> *"Think together. Code without limits — instant encrypted code sharing with zero friction."*
 
----
-
-## 🌟 Features
-
-- **No Signup, Instant Access**: Create or join any room in one second. Share the URL with anyone to collaborate instantly.
-- **Mesh-Type Modern UI**: Dark, distraction-free drafting canvas with subtle ambient mesh gradients and high-contrast JetBrains Mono typography.
-- **Automatic Auto-Save**: Keystrokes are automatically debounced and saved in real-time, accompanied by a visual indicator (`● Saved` / `● Saving...`).
-- **Seamless Multi-Device Sync**:
-  - What User A types, User B sees live on their screen.
-  - What User B types, User A sees live on their screen.
-  - Opening the link on any other computer, tablet, or phone immediately loads the latest auto-saved code.
-- **Monaco Editor Engine (VS Code)**: Full syntax highlighting, line numbers, bracket matching, code folding, and multi-language support (JavaScript, Python, HTML/CSS, TypeScript, C++, Rust, Go, SQL, JSON, Markdown).
-- **1-Click Link Sharing**: Click "Share Link" to copy the room URL to your clipboard.
+[![License: MIT](https://img.shields.io/badge/License-MIT-white.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Deploy](https://img.shields.io/badge/Live_Demo-GitHub_Pages-black.svg?style=flat-square&logo=github)](https://kaushalboii.github.io/codeshift/)
+[![Monaco Editor](https://img.shields.io/badge/Engine-Monaco_VS_Code-blue.svg?style=flat-square)](https://microsoft.github.io/monaco-editor/)
+[![Privacy](https://img.shields.io/badge/Privacy-Zero_Tracking-emerald.svg?style=flat-square)](#-privacy--security-guarantee)
 
 ---
 
-## 🏗️ Architecture: Clean Frontend & Backend Separation
+## 🌐 Live Application
 
-CodeShare is cleanly separated into a client-side frontend and flexible backend options:
+👉 **Try it Live**: [https://kaushalboii.github.io/codeshift/](https://kaushalboii.github.io/codeshift/)
+
+![CodeShift Preview & Real-Time Sync Simulation](./brand/preview.svg)
+
+---
+
+## 🌟 What is CodeShift?
+
+**CodeShift** is an open-source, high-performance real-time collaborative code editor. Anyone with a room URL can collaborate instantaneously — no accounts, no passwords, no email collection, and no tracking cookies.
+
+All code edits are compressed client-side with LZW and encrypted locally in your browser before synchronization.
+
+---
+
+## ✨ Key Features
+
+- **🚀 Zero Login Friction**: Open a room URL (e.g. `kaushalboii.github.io/codeshift/#/my-room`) and immediately start typing. No sign-up barriers.
+- **🔒 Client-Side Payload Encryption**: Payloads are encrypted and compressed on the client before being sent across the wire. Cloud databases store only ciphertext.
+- **👥 Live Collaborative Presence**:
+  - Remote cursors with active line tinting and name tags (`[ Anonymous 17 ]`).
+  - Peer synchronization via Firebase Realtime Database & local `BroadcastChannel`.
+- **💻 Monaco Editor (VS Code Power)**:
+  - Rich syntax highlighting for JavaScript, TypeScript, Python, HTML, CSS, Rust, Go, C++, SQL, and JSON.
+  - Bracket matching, line numbers, word wrap, and customizable tab sizes.
+- **🎨 Living 3D Teal Particle Wave Landing Page**: Interactive mathematical wave canvas reacting dynamically to mouse movement.
+- **🖤 Minimal Black & White Aesthetics**: Clean monochrome buttons, gamified action controls, and modern dark-mode palettes.
+- **🛡️ Built-in Privacy Policy Modal**: Absolute zero-tracking commitment with zero third-party analytics.
+
+---
+
+## 🔄 Live Simulation: How CodeShift Works
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    FRONTEND CLIENT (SPA)                     │
-│  • index.html, styles.css, app.js                            │
-│  • Deployed on GitHub Pages: https://kaushalboii.github.io/codeshift │
-│  • Zero-login, instant room URL: /#/room-123                 │
-└──────────────────────────────┬───────────────────────────────┘
-                               │
-            ┌──────────────────┴──────────────────┐
-            ▼                                     ▼
-┌───────────────────────────────┐   ┌───────────────────────────┐
-│     OPTION 1: FIREBASE RTDB   │   │  OPTION 2: NODE.JS SERVER │
-│   (Serverless Cloud Database) │   │        (server.js)        │
-├───────────────────────────────┤   ├───────────────────────────┤
-│ • Free client-side cloud sync │   │ • Native RFC 6455 WebSockets│
-│ • Runs directly on GitHub Pages│   │ • In-memory room manager  │
-│ • Zero backend hosting needed │   │ • Saves to .data/rooms.json│
-│ • WebSockets built into SDK   │   │ • Run with 'npm start'    │
-└───────────────────────────────┘   └───────────────────────────┘
+┌─────────────────────────────────┐               ┌─────────────────────────────────┐
+│     User A (Browser Client)     │               │     User B (Browser Client)     │
+│  "kaushalboii.github.io/.../#/" │               │  "kaushalboii.github.io/.../#/" │
+└───────────────┬─────────────────┘               └─────────────────┬───────────────┘
+                │                                                   │
+     1. Type / Move Cursor                               3. Decrypt & Render Live
+     2. LZW Compress + Encrypt Payload                   4. Update Monaco Editor
+                │                                                   │
+                ▼                                                   ▼
+       [ Local Ciphertext ]                                [ Local Ciphertext ]
+                │                                                   ▲
+                └───────────────────┐           ┌───────────────────┘
+                                    ▼           │
+                         ┌───────────────────────────────┐
+                         │   Firebase Realtime Database  │
+                         │     (Zero-Knowledge Relay)    │
+                         │                               │
+                         │  • Stores solely ciphertext   │
+                         │  • Ephemeral presence pings   │
+                         │  • Sub-100ms global sync      │
+                         └───────────────────────────────┘
+```
+
+1. **User A opens or creates a room**: Navigates to `kaushalboii.github.io/codeshift/#/room-name`.
+2. **User A shares link with User B**: User B opens the exact same URL.
+3. **Real-time Synchronization**:
+   - Every keystroke is debounced, compressed, encrypted, and relayed to Firebase.
+   - User B's screen automatically decrypts the payload and updates the Monaco editor document.
+   - User B's cursor position is displayed on User A's editor with a live tag (`[ Anonymous 17 ]`) and active line tinting.
+
+---
+
+## 🌐 Custom Domain: How to Change the Domain in GitHub Pages
+
+By default, GitHub Pages serves the site at:
+```
+https://kaushalboii.github.io/codeshift/
+```
+
+If you want a custom domain (like `codeshift.io`, `codeshift.dev`, or your own domain):
+
+### Step 1: Purchase or Prepare Your Domain
+Register your chosen domain through any registrar (e.g. Cloudflare, Namecheap, GoDaddy, Porkbun).
+
+### Step 2: Configure DNS Records in Your Registrar
+Add the following **DNS A Records** pointing to GitHub's official IP addresses:
+
+| Type | Host / Name | Value / IP |
+| :--- | :--- | :--- |
+| **A** | `@` (root) | `185.199.108.153` |
+| **A** | `@` (root) | `185.199.109.153` |
+| **A** | `@` (root) | `185.199.110.153` |
+| **A** | `@` (root) | `185.199.111.153` |
+
+*If you prefer a subdomain (e.g., `code.yourdomain.com`), add a **CNAME** record pointing to `kaushalboii.github.io`.*
+
+### Step 3: Enable Custom Domain in GitHub
+1. Go to your repository on GitHub: `https://github.com/kaushalboii/codeshift`
+2. Click **Settings** ⚙️ → **Pages** (in the left sidebar).
+3. Under **Custom domain**, enter your domain name (e.g. `codeshift.io` or `code.yourdomain.com`).
+4. Click **Save**. GitHub will automatically verify DNS and generate a free HTTPS certificate (Let's Encrypt).
+5. Check **Enforce HTTPS**.
+
+*(CodeShift's URL prefix in the landing page automatically adapts dynamically to whatever domain you use!)*
+
+---
+
+## 🔒 Privacy & Security Guarantee
+
+- **No Cookies & Zero Trackers**: No Google Analytics, Meta Pixels, or third-party tracking scripts.
+- **Zero Identification**: No accounts, usernames, passwords, or emails stored.
+- **Encrypted Payloads**: Code buffers are encrypted before persistence.
+- **100% Free & Open Source**: Full source code available under the MIT License for public auditing.
+
+---
+
+## 📁 Clean Repository Structure
+
+```
+codeshift/
+├── index.html           # Single-Page Application (Landing + Monaco Editor + Modals)
+├── styles.css           # Minimal Black & White typography, themes & animations
+├── app.js               # Reactive router, Monaco setup, encryption & Firebase sync
+├── 404.html             # GitHub Pages SPA hash routing redirect
+├── package.json         # Static metadata and local serve scripts
+├── README.md            # Comprehensive documentation & setup guide
+├── brand/
+│   ├── preview.svg      # Visual architecture & interface simulation banner
+│   ├── logo-mark.svg    # Vector brand icon mark
+│   ├── logo-full.svg    # Full vector wordmark
+│   └── favicon.svg      # Site favicon
+└── public/
+    ├── preview.svg      # Static asset preview
+    ├── logo.svg         # Public logo
+    ├── favicon.svg      # Public favicon
+    └── moon-poster.jpg  # Background aesthetic asset
 ```
 
 ---
 
-## 💾 Which Database Should You Use? (Firebase vs Node Backend)
+## 💻 Local Development
 
-You asked: *"the db we can use the firebase naa that will be easy or which one can we use for now ??"*
-
-### ✅ Recommended for GitHub Pages: **Firebase Realtime Database**
-Because GitHub Pages is a static web host, it **cannot** run Node.js backend servers. **Firebase Realtime Database** is the best and easiest solution:
-1. **100% Free**: Firebase's Spark plan provides free real-time database hosting with up to 100 simultaneous active connections.
-2. **Zero Backend to Maintain**: The frontend connects directly to Firebase over WebSockets. No need to deploy or pay for cloud servers.
-3. **Instant Cross-Device Sync**: Any keystroke auto-saves to Firebase in milliseconds. Opening the room URL on another computer loads the code immediately.
-
-#### 1-Minute Free Firebase Setup:
-1. Open [console.firebase.google.com](https://console.firebase.google.com) and click **Create a project**.
-2. In the left menu, click **Build** → **Realtime Database** → **Create Database**.
-3. Choose a region and select **Start in test mode** (allows open read/write without login).
-4. Copy your Database URL:
-   `https://<your-project-id>-default-rtdb.firebaseio.com`
-5. In CodeShare, click **☁️ Cloud Sync** in the top bar and paste your URL.
-   *(You can also share it in the URL: `https://kaushalboii.github.io/codeshift/#/my-room?fb=https://your-project.firebaseio.com`)*.
-
----
-
-### 🖥️ Alternative: Self-Hosted Node.js Server (`server.js`)
-If you want to run your own backend on localhost, a VPS, or Render:
+Run CodeShift locally with any static HTTP server:
 
 ```bash
-# Start the local backend server
-npm start
-# or
-node server.js
+# Clone the repository
+git clone https://github.com/kaushalboii/codeshift.git
+cd codeshift
+
+# Start a local static web server
+npx serve -l 3000 .
 ```
-The server will start on port `3000` with native WebSockets and persist rooms locally in `.data/rooms.json`.
+
+Open `http://localhost:3000` in your browser.
 
 ---
 
-## 🚀 Quick Start
+## 📜 License & Attribution
 
-1. Open `index.html` in your browser or visit [kaushalboii.github.io/codeshift](https://kaushalboii.github.io/codeshift/).
-2. A new instant room is created automatically (e.g. `/#/dev-3x8f`).
-3. Type or paste your code. Notice the `● Saved` indicator.
-4. Click **Share Link** and open it on another device or send it to a friend.
-5. Both screens sync in real-time as you type!
+Developed & maintained with 🤍 by **[Kaushal](https://github.com/kaushalboii)**.
 
----
-
-## 👥 License & Credits
-Created by **Kaushal**. Released under the [MIT License](./package.json).
+Released under the [MIT License](https://opensource.org/licenses/MIT). Free for personal, commercial, and educational use.

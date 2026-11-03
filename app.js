@@ -251,6 +251,9 @@
     inputShareLink:  document.getElementById('input-share-link'),
     modalSettings:   document.getElementById('modal-settings'),
     modalShare:      document.getElementById('modal-share'),
+    modalPrivacy:    document.getElementById('modal-privacy'),
+    roomPrefixLabel: document.getElementById('room-prefix-label'),
+    codeCardComment: document.getElementById('code-card-comment'),
     settingFontsize: document.getElementById('setting-fontsize'),
     settingTabsize:  document.getElementById('setting-tabsize'),
     settingWordwrap: document.getElementById('setting-wordwrap'),
@@ -1060,6 +1063,9 @@
   const btnCloseShare    = document.getElementById('btn-close-share');
   const btnModalCopyLink = document.getElementById('btn-modal-copy-link');
   const btnModalDone     = document.getElementById('btn-modal-done-share');
+  const btnOpenPrivacy   = document.getElementById('btn-open-privacy');
+  const btnClosePrivacy  = document.getElementById('btn-close-privacy');
+  const btnDonePrivacy   = document.getElementById('btn-done-privacy');
 
   // Return to landing
   function goHome() {
@@ -1147,8 +1153,28 @@
     closeModal(el.modalShare);
   });
 
+  // Privacy Policy Modal
+  if (btnOpenPrivacy)  btnOpenPrivacy.addEventListener('click', () => openModal(el.modalPrivacy));
+  if (btnClosePrivacy) btnClosePrivacy.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeModal(el.modalPrivacy);
+  });
+  if (btnDonePrivacy)  btnDonePrivacy.addEventListener('click', () => closeModal(el.modalPrivacy));
+
+  // Dynamic URL prefix in landing page room input and code preview card
+  function updateUrlPrefix() {
+    try {
+      const host = window.location.host;
+      const path = window.location.pathname.replace(/\/+$/, '');
+      const prefix = host ? `${host}${path}/#/` : 'codeshift/#/';
+      if (el.roomPrefixLabel) el.roomPrefixLabel.textContent = prefix;
+      if (el.codeCardComment) el.codeCardComment.textContent = `// ${prefix}your-room · synced in real-time`;
+    } catch (_) {}
+  }
+
   // Modal Backdrop Dismiss
-  [el.modalSettings, el.modalShare].forEach(modal => {
+  [el.modalSettings, el.modalShare, el.modalPrivacy].forEach(modal => {
     if (modal) modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal(modal);
     });
@@ -1159,12 +1185,14 @@
     if (e.key === 'Escape') {
       closeModal(el.modalSettings);
       closeModal(el.modalShare);
+      closeModal(el.modalPrivacy);
     }
   });
 
   // ──────────────────────────────────────────────
   // BOOTSTRAP
   // ──────────────────────────────────────────────
+  updateUrlPrefix();
   initRouter();
 
 })();
