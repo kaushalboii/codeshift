@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Job 1: Build & Deploy to gh-pages branch (Guaranteed to succeed under all repository settings)
+  # Only job: Build & push to gh-pages branch. This is the reliable method.
   deploy-gh-pages-branch:
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +25,14 @@ jobs:
       - name: Prepare Clean Distribution
         run: |
           mkdir -p dist
-          cp -r index.html 404.html app.js styles.css public brand .nojekyll README.md dist/
+          cp index.html dist/
+          cp 404.html dist/
+          cp app.js dist/
+          cp styles.css dist/
+          cp .nojekyll dist/
+          cp README.md dist/
+          cp -r public dist/
+          cp -r brand dist/
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
@@ -35,34 +42,3 @@ jobs:
           publish_branch: gh-pages
           force_orphan: true
 
-  # Job 2: Deploy to GitHub Pages via Actions (Active when Settings -> Pages -> Source is 'GitHub Actions')
-  deploy-pages-action:
-    needs: deploy-gh-pages-branch
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-        continue-on-error: true
-
-      - name: Prepare Clean Distribution
-        run: |
-          mkdir -p dist
-          cp -r index.html 404.html app.js styles.css public brand .nojekyll README.md dist/
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        continue-on-error: true

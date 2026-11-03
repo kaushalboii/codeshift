@@ -4,172 +4,511 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeShift — Real-Time Collaborative Code Editor</title>
-  <meta name="description" content="Instant real-time code sharing with auto-save and seamless multi-device sync without login.">
+  <meta name="description" content="Instant real-time code sharing. Open a room, paste a URL, code together from anywhere.">
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
 
-  <!-- GitHub Pages SPA Path Restorer: Removes # and restores clean path -->
-  <script>
-    (function() {
-      var savedRoom = sessionStorage.getItem('codeshift_room');
-      if (savedRoom) {
-        sessionStorage.removeItem('codeshift_room');
-        var repoPrefix = window.location.pathname.startsWith('/codeshift') ? '/codeshift' : '';
-        window.history.replaceState(null, null, repoPrefix + '/' + encodeURIComponent(savedRoom));
-      }
-    })();
-  </script>
-
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <!-- Monaco Editor Loader (VS Code Engine) -->
+  <!-- Monaco Editor -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 
-  <!-- Firebase Realtime Database (Client SDK) -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <!-- PeerJS for direct WebRTC cross-device sync -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
   <link rel="stylesheet" href="styles.css">
+
+  <style>
+    /* ============================================================
+       LANDING PAGE
+    ============================================================ */
+    #landing-page {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #f9fafb;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #landing-page.hidden { display: none !important; }
+
+    /* Landing mesh background (light version) */
+    .landing-mesh {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(at 0% 0%, rgba(129, 140, 248, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(192, 132, 252, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(16, 185, 129, 0.07) 0px, transparent 50%);
+    }
+
+    .landing-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+
+    /* Landing Nav */
+    .landing-nav {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 36px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      background: rgba(249, 250, 251, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .landing-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      user-select: none;
+    }
+
+    .landing-brand-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.5px;
+    }
+
+    .landing-brand-shift {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Landing Hero */
+    .landing-hero {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .landing-tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6366f1;
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.18);
+      padding: 5px 12px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+    }
+
+    .landing-tagline::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981;
+      display: inline-block;
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .landing-headline {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(32px, 6vw, 58px);
+      font-weight: 800;
+      color: #111827;
+      line-height: 1.12;
+      letter-spacing: -1.5px;
+      max-width: 680px;
+      margin-bottom: 18px;
+    }
+
+    .landing-headline .hl-gradient {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .landing-sub {
+      font-size: 17px;
+      font-weight: 400;
+      color: #6b7280;
+      max-width: 520px;
+      line-height: 1.65;
+      margin-bottom: 40px;
+    }
+
+    /* ASCII Code art card */
+    .landing-code-preview {
+      background: #1a1d2e;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 44px;
+      max-width: 560px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 20px 60px rgba(99,102,241,0.15), 0 4px 16px rgba(0,0,0,0.12);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .landing-code-preview::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(99,102,241,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .code-dots {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .code-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .code-dot.red { background: #ff5f57; }
+    .code-dot.yellow { background: #ffbd2e; }
+    .code-dot.green { background: #28c840; }
+
+    .code-line {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.85;
+      white-space: pre;
+    }
+
+    .cl-comment { color: #4b5563; }
+    .cl-kw { color: #c084fc; font-weight: 600; }
+    .cl-fn { color: #818cf8; }
+    .cl-str { color: #34d399; }
+    .cl-num { color: #fbbf24; }
+    .cl-dim { color: #374151; }
+    .cl-punct { color: #9ca3af; }
+    .cl-blink {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: #6366f1;
+      vertical-align: bottom;
+      animation: cursorBlink 1.1s step-end infinite;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Room input + CTA */
+    .landing-room-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 440px;
+      margin-bottom: 20px;
+    }
+
+    .landing-room-prefix {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .landing-room-input {
+      flex: 1;
+      background: #ffffff;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .landing-room-input::placeholder {
+      color: #9ca3af;
+    }
+
+    .landing-room-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    }
+
+    .landing-cta-btn {
+      background: #6366f1;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      box-shadow: 0 2px 12px rgba(99,102,241,0.35);
+    }
+
+    .landing-cta-btn:hover {
+      background: #4f46e5;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(99,102,241,0.45);
+    }
+
+    .landing-cta-secondary {
+      font-size: 12.5px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    .landing-cta-secondary a, .landing-cta-secondary span {
+      color: #6366f1;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: rgba(99,102,241,0.35);
+    }
+
+    /* Landing footer */
+    .landing-footer {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 14px 24px;
+      font-size: 11.5px;
+      color: #9ca3af;
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* ============================================================
+       EDITOR PAGE  (dark mesh, full-height)
+    ============================================================ */
+    #editor-page {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      z-index: 10;
+    }
+
+    #editor-page.hidden { display: none !important; }
+  </style>
 </head>
 <body>
 
-  <!-- Ambient Mesh Background -->
-  <div class="mesh-background-glow"></div>
-  <div class="mesh-grid-pattern"></div>
+  <!-- ============================================================
+       LANDING PAGE
+  ============================================================ -->
+  <div id="landing-page">
+    <div class="landing-mesh"></div>
+    <div class="landing-grid"></div>
 
-  <!-- Toast Container -->
-  <div id="toast-container"></div>
+    <nav class="landing-nav">
+      <a class="landing-brand" href="javascript:void(0)" id="landing-brand-link">
+        <svg viewBox="0 0 36 36" width="26" height="26" fill="none">
+          <path d="M10 9L4 18L10 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26 9L32 18L26 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#8b5cf6"/>
+        </svg>
+        <span class="landing-brand-text">Code<span class="landing-brand-shift">Shift</span></span>
+      </a>
+    </nav>
 
-  <!-- App Shell -->
-  <div id="app">
+    <div class="landing-hero">
+      <div class="landing-tagline">Real-Time Code Sharing · No Login Required</div>
 
-    <!-- Top Navigation Header -->
-    <header class="app-header">
-      
-      <div class="header-left">
-        <!-- CodeShift Brand Logo -->
-        <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="New CodeShift Room">
-          <svg class="brand-logo-icon" viewBox="0 0 36 36" width="24" height="24" fill="none">
-            <path d="M10 9L4 18L10 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M26 9L32 18L26 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#C084FC"/>
-          </svg>
-          <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
-        </a>
+      <h1 class="landing-headline">
+        Code Together.<br>
+        <span class="hl-gradient">Anywhere. Instantly.</span>
+      </h1>
 
-        <!-- Room Link Badge (Click to copy or change) -->
-        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link or switch room">
-          <span>🔗</span>
-          <span id="room-nav-id">/room</span>
+      <p class="landing-sub">
+        Open a room, share the URL. Anyone with the link can view and edit in real-time — no account, no setup, no friction.
+      </p>
+
+      <!-- Code ASCII Preview Card -->
+      <div class="landing-code-preview" aria-hidden="true">
+        <div class="code-dots">
+          <div class="code-dot red"></div>
+          <div class="code-dot yellow"></div>
+          <div class="code-dot green"></div>
         </div>
-
-        <!-- Auto-Save Status Pill -->
-        <div class="save-status-pill" id="save-status-container" title="Every keystroke is auto-saved in real-time">
-          <span class="status-dot saved" id="save-status-dot"></span>
-          <span id="save-status-text">Saved</span>
-        </div>
+        <div class="code-line"><span class="cl-comment">// codeshift.io/your-room-name</span></div>
+        <div class="code-line"><span class="cl-comment">// two users · synced in real-time</span></div>
+        <div class="code-line"><span class="cl-dim"> </span></div>
+        <div class="code-line"><span class="cl-kw">async function</span> <span class="cl-fn">collaborate</span><span class="cl-punct">(</span><span class="cl-fn">roomId</span><span class="cl-punct">) {</span></div>
+        <div class="code-line">  <span class="cl-kw">const</span> session <span class="cl-punct">=</span> <span class="cl-kw">await</span> CodeShift<span class="cl-punct">.</span><span class="cl-fn">join</span><span class="cl-punct">(</span>roomId<span class="cl-punct">);</span></div>
+        <div class="code-line">  session<span class="cl-punct">.</span><span class="cl-fn">onCode</span><span class="cl-punct">(</span>code <span class="cl-punct">=&gt;</span> <span class="cl-fn">sync</span><span class="cl-punct">(</span>code<span class="cl-punct">));</span></div>
+        <div class="code-line">  <span class="cl-kw">return</span> <span class="cl-str">"collab ready ✓"</span><span class="cl-punct">;</span></div>
+        <div class="code-line"><span class="cl-punct">}</span></div>
+        <div class="code-line"><span class="cl-dim"> </span></div>
+        <div class="code-line"><span class="cl-fn">collaborate</span><span class="cl-punct">(</span><span class="cl-str">"your-room"</span><span class="cl-punct">);</span><span class="cl-blink"></span></div>
       </div>
 
-      <!-- Center Controls: Active Users Online Counter -->
-      <div class="header-center">
-        <!-- Live Online Users Counter -->
-        <div class="online-users-badge" id="online-users-badge" title="Active users in this room">
-          <span class="presence-pulse"></span>
-          <span id="user-role-badge">👥</span>
-          <span id="online-users-count">1 online</span>
-        </div>
+      <!-- Room Input -->
+      <div class="landing-room-form">
+        <span class="landing-room-prefix">codeshift.io/</span>
+        <input
+          id="landing-room-input"
+          class="landing-room-input"
+          type="text"
+          placeholder="your-room-name"
+          maxlength="64"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="landing-open-btn" class="landing-cta-btn">Open →</button>
       </div>
 
-      <!-- Right Action Controls -->
-      <div class="header-right">
-        
-        <!-- Copy Share Link Button (Primary) -->
-        <button id="btn-share-room" class="btn-coral-share" title="Copy clean room link">
-          <span>📋</span>
-          <span>Copy Link</span>
-        </button>
+      <p class="landing-cta-secondary">
+        or <span id="landing-random-btn">open a random room instantly</span>
+      </p>
+    </div>
 
-        <!-- New Clean Room -->
-        <button id="btn-create-new-room" class="btn-subtle-action" title="Create a new clean code room">
-          <span>➕</span>
-          <span>New</span>
-        </button>
-
-        <!-- Download Code -->
-        <button id="btn-download-code" class="btn-subtle-action" title="Download Code File">
-          <span>⬇️</span>
-          <span>Export</span>
-        </button>
-
-        <!-- Preferences / Settings -->
-        <button id="btn-open-settings" class="btn-icon-rail" title="Editor Preferences">
-          <span>⚙️</span>
-        </button>
-
-      </div>
-
-    </header>
-
-    <!-- Code Editor Canvas (Full Height Type Space) -->
-    <main class="editor-viewport-wrapper">
-      <div id="monaco-editor-container"></div>
-      
-      <!-- Lightweight Fallback Editor -->
-      <div id="fallback-editor-wrapper" class="hidden">
-        <div id="editor-line-numbers">1</div>
-        <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Type or paste your code here... Auto-saves instantaneously."></textarea>
-      </div>
-    </main>
-
-    <!-- Bottom Status Strip -->
-    <footer class="editor-status-bar">
-      <div class="status-left">
-        <span id="cursor-position">Ln 1, Col 1</span>
-        <span>•</span>
-        <span id="code-stats">0 lines</span>
-        <span>•</span>
-        <span id="sync-status">Real-Time Cloud Sync Active</span>
-      </div>
-      <div class="status-right">
-        <span id="editor-engine-label">Monaco Editor (VS Code)</span>
-        <span>•</span>
-        <span>Instant Auto-Save ⚡</span>
-      </div>
+    <footer class="landing-footer">
+      CodeShift &nbsp;·&nbsp; Real-time collaborative code editor &nbsp;·&nbsp; No login required
     </footer>
-
   </div>
 
+  <!-- ============================================================
+       EDITOR PAGE
+  ============================================================ -->
+  <div id="editor-page" class="hidden">
 
-  <!-- ==================================================================== -->
-  <!-- MODAL DIALOGS                                                        -->
-  <!-- ==================================================================== -->
+    <!-- Ambient Mesh Background (dark) -->
+    <div class="mesh-background-glow"></div>
+    <div class="mesh-grid-pattern"></div>
 
-  <!-- 1. Share Link Modal -->
-  <div id="modal-share" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">Share Code in Real-Time</h3>
-        <button id="btn-close-share" class="modal-close-btn">✕</button>
-      </div>
-      <div class="modal-content">
-        <p class="modal-description">Anyone with this link will immediately see your code and synchronize changes in real-time across devices.</p>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="input-share-link" class="form-input" style="font-family: var(--cs-font-mono);" readonly>
-          <button id="btn-modal-copy-link" class="btn-primary" style="white-space: nowrap;">Copy Link</button>
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- App Shell -->
+    <div id="app" style="position:relative;z-index:10;width:100vw;height:100vh;display:flex;flex-direction:column;">
+
+      <!-- Top Navigation Header -->
+      <header class="app-header">
+        
+        <div class="header-left">
+          <!-- CodeShift Brand Logo (back to landing) -->
+          <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="Go to Home">
+            <svg class="brand-logo-icon" viewBox="0 0 36 36" width="22" height="22" fill="none">
+              <path d="M10 9L4 18L10 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M26 9L32 18L26 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#C084FC"/>
+            </svg>
+            <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
+          </a>
+
+          <!-- Room Link Badge -->
+          <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link">
+            <span>🔗</span>
+            <span id="room-nav-id">/room</span>
+          </div>
+
+          <!-- Auto-Save Status -->
+          <div class="save-status-pill" id="save-status-container">
+            <span class="status-dot saved" id="save-status-dot"></span>
+            <span id="save-status-text">Saved</span>
+          </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-modal-done-share" class="btn-secondary">Done</button>
-      </div>
+
+        <!-- Center: Online count -->
+        <div class="header-center">
+          <div class="online-users-badge" id="online-users-badge">
+            <span class="presence-pulse"></span>
+            <span id="online-users-count">1 online</span>
+          </div>
+        </div>
+
+        <!-- Right Action Controls -->
+        <div class="header-right">
+          <button id="btn-share-room" class="btn-coral-share" title="Copy clean room link">
+            <span>📋</span>
+            <span>Copy Link</span>
+          </button>
+          <button id="btn-create-new-room" class="btn-subtle-action" title="New room">
+            <span>➕</span>
+            <span>New</span>
+          </button>
+          <button id="btn-download-code" class="btn-subtle-action" title="Download Code">
+            <span>⬇️</span>
+            <span>Export</span>
+          </button>
+          <button id="btn-open-settings" class="btn-icon-rail" title="Editor Preferences">
+            <span>⚙️</span>
+          </button>
+        </div>
+
+      </header>
+
+      <!-- Editor Canvas -->
+      <main class="editor-viewport-wrapper">
+        <div id="monaco-editor-container"></div>
+        <div id="fallback-editor-wrapper" class="hidden">
+          <div id="editor-line-numbers">1</div>
+          <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Start typing your code..."></textarea>
+        </div>
+      </main>
+
+      <!-- Status Bar -->
+      <footer class="editor-status-bar">
+        <div class="status-left">
+          <span id="cursor-position">Ln 1, Col 1</span>
+          <span>•</span>
+          <span id="code-stats">0 lines</span>
+          <span>•</span>
+          <span id="sync-status">Real-Time Sync Active</span>
+        </div>
+        <div class="status-right">
+          <span id="editor-engine-label">Monaco Editor (VS Code)</span>
+          <span>•</span>
+          <span>Auto-Save ⚡</span>
+        </div>
+      </footer>
+
     </div>
   </div>
 
-  <!-- 2. Preferences Modal -->
+  <!-- Settings Modal -->
   <div id="modal-settings" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -186,7 +525,6 @@
             <option value="18">18px</option>
           </select>
         </div>
-
         <div class="form-group">
           <label class="form-label" for="setting-tabsize">Tab Size</label>
           <select id="setting-tabsize" class="form-input">
@@ -194,14 +532,12 @@
             <option value="4">4 Spaces</option>
           </select>
         </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-          <span style="font-size: 12.5px;">Word Wrap</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <span style="font-size:12.5px;">Word Wrap</span>
           <input type="checkbox" id="setting-wordwrap" checked>
         </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-          <span style="font-size: 12.5px;">Typing Sound Effects</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <span style="font-size:12.5px;">Typing Sound Effects</span>
           <input type="checkbox" id="setting-sound" checked>
         </div>
       </div>
@@ -211,78 +547,30 @@
     </div>
   </div>
 
-  <!-- Hidden compatibility elements to maintain complete JS runtime compatibility -->
-  <div id="modal-nickname" class="hidden"></div>
-  <input type="hidden" id="input-new-nickname" value="Anonymous">
-  <button id="btn-save-nickname" class="hidden"></button>
-  <button id="btn-cancel-nickname" class="hidden"></button>
-  <select id="select-language" class="hidden"><option value="plaintext">Plain</option></select>
-  <div id="view-landing" class="hidden"></div>
-  <div id="view-room" class="hidden"></div>
-  <footer id="app-footer" class="hidden"></footer>
-  <div id="room-nav-controls" class="hidden"></div>
-  <div id="peer-avatars" class="hidden"></div>
-  <span id="global-connection-pill" class="hidden"></span>
-  <span id="global-connection-label" class="hidden"></span>
-  <span id="sync-indicator-dot" class="hidden"></span>
-  <div id="readonly-banner" class="hidden"></div>
-  <span id="badge-execution-mode" class="hidden"></span>
-  <button id="nav-btn-instant-room" class="hidden"></button>
-  <button id="btn-create-or-join" class="hidden"></button>
-  <input type="hidden" id="input-custom-room" value="">
-  <button id="btn-quick-sample-room" class="hidden"></button>
-  <select id="select-theme" class="hidden"><option value="codeshift">Default</option></select>
-  <button id="btn-run-code" class="hidden"></button>
-  <button id="btn-format-code" class="hidden"></button>
-  <button id="btn-take-snapshot" class="hidden"></button>
-  <button id="btn-toggle-sidepanel" class="hidden"></button>
-  <button id="btn-toggle-readonly" class="hidden"></button>
-  <span id="icon-readonly" class="hidden"></span>
-  <span id="label-readonly" class="hidden"></span>
-  <button id="btn-set-room-password" class="hidden"></button>
-  <div id="side-panel" class="hidden"></div>
-  <div class="side-tab hidden" data-tab="tab-console"></div>
-  <div class="tab-pane hidden" id="tab-console"></div>
-  <div id="console-output" class="hidden"></div>
-  <button id="btn-clear-console" class="hidden"></button>
-  <iframe id="preview-iframe" class="hidden"></iframe>
-  <button id="btn-refresh-preview" class="hidden"></button>
-  <input type="hidden" id="input-chat-message" value="">
-  <button id="btn-send-chat" class="hidden"></button>
-  <div id="chat-messages-container" class="hidden"></div>
-  <span id="badge-chat-unread" class="hidden"></span>
-  <div id="snapshots-list" class="hidden"></div>
-  <span id="badge-snapshots-count" class="hidden">0</span>
-  <button id="btn-create-snapshot-modal" class="hidden"></button>
-  <div id="modal-password" class="hidden"></div>
-  <input type="hidden" id="input-room-password" value="">
-  <div id="password-error" class="hidden"></div>
-  <button id="btn-submit-password" class="hidden"></button>
-  <button id="btn-cancel-password" class="hidden"></button>
-  <div id="modal-set-password" class="hidden"></div>
-  <input type="hidden" id="input-new-room-password" value="">
-  <button id="btn-save-room-password" class="hidden"></button>
-  <button id="btn-cancel-set-password" class="hidden"></button>
-  <div id="modal-diff" class="hidden"></div>
-  <div id="diff-viewer" class="hidden"></div>
-  <div id="diff-modal-title" class="hidden"></div>
-  <div id="diff-modal-subtitle" class="hidden"></div>
-  <button id="btn-close-diff-modal" class="hidden"></button>
-  <button id="btn-close-diff" class="hidden"></button>
-  <button id="btn-restore-diff-snapshot" class="hidden"></button>
-  <div id="connection-notice-banner" class="hidden"></div>
-  <div id="connection-notice-text" class="hidden"></div>
-  <button id="btn-banner-config-server" class="hidden"></button>
-  <button id="btn-banner-dismiss" class="hidden"></button>
-  <button id="btn-open-cloud-sync" class="hidden"></button>
-  <div id="modal-cloud-sync" class="hidden"></div>
+  <!-- Share Modal -->
+  <div id="modal-share" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Share This Room</h3>
+        <button id="btn-close-share" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-content">
+        <p class="modal-description">Anyone with this link can view and edit in real-time — no login needed.</p>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="input-share-link" class="form-input" style="font-family:var(--cs-font-mono);" readonly>
+          <button id="btn-modal-copy-link" class="btn-primary" style="white-space:nowrap;">Copy</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-done-share" class="btn-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden stubs for any old JS references -->
   <input type="hidden" id="input-firebase-url" value="https://codeshift-realtimedb-default-rtdb.firebaseio.com">
   <input type="hidden" id="setting-server-url" value="">
-  <button id="btn-save-cloud-sync" class="hidden"></button>
-  <button id="btn-test-server-ping" class="hidden"></button>
-  <button id="btn-close-cloud-sync" class="hidden"></button>
-  <div id="sync-diagnostics" class="hidden"></div>
-  <span id="cloud-sync-badge" class="hidden"></span>
+  <select id="select-language" style="display:none;"><option value="javascript">JavaScript</option></select>
 
   <script src="app.js"></script>
 </body>
