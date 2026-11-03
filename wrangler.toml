@@ -17,3 +17,4 @@ new_classes = ["CodeShiftRoom"]
 # binding = "DB"
 # database_name = "codeshift-db"
 # database_id = "your-d1-database-id"
+

@@ -25,3 +25,4 @@ CREATE TABLE IF NOT EXISTS snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_rooms_last_activity ON rooms(last_activity_at);
 CREATE INDEX IF NOT EXISTS idx_snapshots_room ON snapshots(room_id, created_at DESC);
+
