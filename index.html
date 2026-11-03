@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeShift — Real-Time Collaborative Code Editor</title>
-  <meta name="description" content="Instant real-time code sharing. Open a room, paste a URL, code together from anywhere.">
+  <meta name="description"
+    content="Instant real-time code sharing. Open a room, paste a URL, code together from anywhere.">
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
 
   <!-- ============================================================
@@ -28,7 +30,9 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
 
   <!--
     NOTE: Monaco loader.min.js is intentionally NOT loaded here.
@@ -56,7 +60,9 @@
       flex-direction: column;
       overflow: hidden;
     }
-    #landing-page.hidden { display: none !important; }
+    #landing-page.hidden {
+      display: none !important;
+    }
 
     /* Animated canvas fills the landing BG */
     #landing-canvas {
@@ -163,6 +169,14 @@
     .code-dot.r { background:#ff5f57; }
     .code-dot.y { background:#ffbd2e; }
     .code-dot.g { background:#28c840; }
+    .code-dot.yellow {
+      background: #ffbd2e;
+    }
+
+    .code-dot.green {
+      background: #28c840;
+    }
+
     .code-line {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px; line-height: 1.9; white-space: pre;
@@ -223,7 +237,7 @@
     .room-hint span {
       color: #6366f1; cursor: pointer;
       text-decoration: underline;
-      text-decoration-color: rgba(99,102,241,0.35);
+      text-decoration-color: rgba(99, 102, 241, 0.35);
     }
 
     /* Landing footer */
@@ -231,7 +245,7 @@
       position: relative; z-index: 20;
       text-align: center; padding: 12px 24px;
       font-size: 11px; color: #9ca3af;
-      border-top: 1px solid rgba(0,0,0,0.06);
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
       background: rgba(240,244,248,0.6);
       backdrop-filter: blur(8px);
       letter-spacing: 0.03em;
@@ -245,9 +259,12 @@
       width: 100vw; height: 100vh;
       position: relative; z-index: 10;
     }
-    #editor-page.hidden { display: none !important; }
+    #editor-page.hidden {
+      display: none !important;
+    }
   </style>
 </head>
+
 <body>
 
   <!-- ============================================================
@@ -262,9 +279,11 @@
     <nav class="landing-nav">
       <a class="landing-brand" href="javascript:void(0)" id="landing-brand-link">
         <svg viewBox="0 0 36 36" width="26" height="26" fill="none">
-          <path d="M10 9L4 18L10 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M26 9L32 18L26 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#8b5cf6"/>
+          <path d="M10 9L4 18L10 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <path d="M26 9L32 18L26 27" stroke="#6366f1" stroke-width="3.2" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#8b5cf6" />
         </svg>
         <span class="landing-brand-text">Code<span class="landing-brand-shift">Shift</span></span>
       </a>
@@ -342,9 +361,11 @@
         <div class="header-left">
           <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="Home">
             <svg class="brand-logo-icon" viewBox="0 0 36 36" width="22" height="22" fill="none">
-              <path d="M10 9L4 18L10 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M26 9L32 18L26 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#C084FC"/>
+              <path d="M10 9L4 18L10 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+              <path d="M26 9L32 18L26 27" stroke="#8B7CFF" stroke-width="3.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+              <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#C084FC" />
             </svg>
             <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
           </a>
@@ -467,8 +488,11 @@
   </div>
 
   <!-- Hidden stubs -->
-  <select id="select-language" style="display:none;"><option value="javascript">JavaScript</option></select>
+  <select id="select-language" style="display:none;">
+    <option value="javascript">JavaScript</option>
+  </select>
 
   <script src="app.js"></script>
 </body>
+
 </html>
