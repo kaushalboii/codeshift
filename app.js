@@ -11,10 +11,15 @@
   // ──────────────────────────────────────────────
   const FIREBASE_BASE = 'https://codeshift-realtimedb-default-rtdb.firebaseio.com';
 
+  const userIdentity = getUserIdentity();
+
   const state = {
     roomId: null,
-    userId: localStorage.getItem('codeshift_uid') || ('anon_' + Math.random().toString(36).substring(2, 9)),
-    userColor: pickColor(),
+    userId: userIdentity.uid,
+    userName: userIdentity.name,
+    userColor: userIdentity.color,
+    cursorLine: 1,
+    cursorCol: 1,
     sseSource: null,
     broadcastChannel: null,
     presenceTimer: null,
@@ -34,9 +39,28 @@
 
   localStorage.setItem('codeshift_uid', state.userId);
 
-  function pickColor() {
-    const c = ['#7ce2ee', '#4ecdc4', '#38bdf8', '#8b5cf6', '#f59e0b', '#ec4899'];
-    return c[Math.floor(Math.random() * c.length)];
+  function getUserIdentity() {
+    let uid = localStorage.getItem('codeshift_uid');
+    if (!uid) {
+      uid = 'anon_' + Math.random().toString(36).substring(2, 8);
+      localStorage.setItem('codeshift_uid', uid);
+    }
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+    const anonNum = (hash % 89) + 11; // stable number e.g. 17 (like Screenshot 3)
+
+    const colors = [
+      '#10b981', // emerald green (Screenshot 3 signature color)
+      '#06b6d4', // cyan
+      '#3b82f6', // blue
+      '#8b5cf6', // purple
+      '#ec4899', // pink
+      '#f59e0b', // amber
+      '#14b8a6'  // teal
+    ];
+    const color = colors[hash % colors.length];
+    const name = localStorage.getItem('codeshift_nickname') || ('Anonymous ' + anonNum);
+    return { uid, name, color, anonNum };
   }
 
   function safeKey(k) {
@@ -373,7 +397,7 @@
       const isMobile = window.innerWidth < 768;
       state.monacoInstance = monaco.editor.create(el.monacoContainer, {
         value: initial,
-        language: 'javascript',
+        language: 'typescript', // Typescript syntax with coding colors
         theme: 'codeshift-dark',
         automaticLayout: true,
         fontSize: isMobile ? Math.min(13, state.settings.fontSize) : state.settings.fontSize,
@@ -391,7 +415,27 @@
         bracketPairColorization: { enabled: true },
         autoClosingBrackets: 'always',
         tabSize: state.settings.tabSize,
-        wordWrap: state.settings.wordWrap ? 'on' : 'off'
+        wordWrap: state.settings.wordWrap ? 'on' : 'off',
+
+        // ── Autocomplete / Suggestions / Recommendations ──
+        // (Commented out per user request to disable recommendation popups when typing)
+        // quickSuggestions: true,
+        // suggestOnTriggerCharacters: true,
+        // wordBasedSuggestions: true,
+        // snippetSuggestions: 'inline',
+        quickSuggestions: false,
+        suggestOnTriggerCharacters: false,
+        acceptSuggestionOnEnter: 'off',
+        tabCompletion: 'off',
+        wordBasedSuggestions: false,
+        parameterHints: { enabled: false },
+        suggest: {
+          showKeywords: false,
+          showSnippets: false,
+          showWords: false,
+          showFunctions: false,
+          showVariables: false
+        }
       });
 
       if (el.fallbackWrapper) el.fallbackWrapper.classList.add('hidden');
@@ -407,10 +451,153 @@
         const lines = state.monacoInstance.getModel().getLineCount();
         if (el.cursorPos) el.cursorPos.textContent = 'Ln ' + p.lineNumber + ', Col ' + p.column;
         if (el.codeStats) el.codeStats.textContent = lines + ' ' + (lines === 1 ? 'line' : 'lines');
+        broadcastCursor(p.lineNumber, p.column);
       });
 
       fetchLatestCode(state.roomId);
     });
+  }
+
+  // ──────────────────────────────────────────────
+  // COLLABORATIVE CURSOR PRESENCE (Screenshot 3 style)
+  // Shows active peer line highlight and [ Anonymous 17 ] tooltip
+  // ──────────────────────────────────────────────
+  const remoteCursors = {}; // peerId -> { widget, decorationIds, line, col, lastSeen }
+  let cursorThrottleTimer = null;
+
+  function injectPeerStyle(peerId, color) {
+    const id = 'peer-style-' + peerId;
+    let s = document.getElementById(id);
+    if (!s) {
+      s = document.createElement('style');
+      s.id = id;
+      document.head.appendChild(s);
+    }
+    s.textContent = `
+      .remote-line-${peerId} {
+        background-color: ${color}1f !important;
+        border-left: 3px solid ${color} !important;
+      }
+      .remote-caret-${peerId} {
+        border-left: 2px solid ${color} !important;
+        height: 100% !important;
+        margin-left: -1px;
+        animation: caretBlink 1s step-end infinite;
+      }
+    `;
+  }
+
+  function renderRemoteCursor(peerId, name, color, line, col) {
+    if (!state.monacoInstance) return;
+    const editor = state.monacoInstance;
+    const model = editor.getModel();
+    if (!model) return;
+
+    const maxLines = model.getLineCount();
+    const safeLine = Math.min(Math.max(1, line), maxLines);
+    const maxCol = model.getLineMaxColumn(safeLine);
+    const safeCol = Math.min(Math.max(1, col), maxCol);
+
+    injectPeerStyle(peerId, color);
+
+    // 1. Delta decorations for active line highlight & caret
+    const prevDecs = remoteCursors[peerId] ? remoteCursors[peerId].decorationIds : [];
+    const newDecs = editor.deltaDecorations(prevDecs, [
+      {
+        range: new monaco.Range(safeLine, 1, safeLine, 1),
+        options: {
+          isWholeLine: true,
+          className: 'remote-line-' + peerId
+        }
+      },
+      {
+        range: new monaco.Range(safeLine, safeCol, safeLine, safeCol),
+        options: {
+          className: 'remote-caret-' + peerId
+        }
+      }
+    ]);
+
+    // 2. ContentWidget for floating pill tooltip [ Anonymous X ]
+    if (!remoteCursors[peerId] || !remoteCursors[peerId].widget) {
+      const domNode = document.createElement('div');
+      domNode.className = 'remote-cursor-widget';
+      domNode.style.backgroundColor = color;
+      domNode.innerHTML = `<span class="remote-cursor-label">${escapeHtml(name)}</span><div class="remote-cursor-arrow" style="border-top-color: ${color};"></div>`;
+
+      const widget = {
+        getId: () => 'remote-cursor-widget-' + peerId,
+        getDomNode: () => domNode,
+        getPosition: () => ({
+          position: { lineNumber: safeLine, column: safeCol },
+          preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE, monaco.editor.ContentWidgetPositionPreference.BELOW]
+        })
+      };
+
+      editor.addContentWidget(widget);
+      remoteCursors[peerId] = { widget, decorationIds: newDecs, line: safeLine, col: safeCol, lastSeen: Date.now() };
+    } else {
+      const w = remoteCursors[peerId].widget;
+      w.getPosition = () => ({
+        position: { lineNumber: safeLine, column: safeCol },
+        preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE, monaco.editor.ContentWidgetPositionPreference.BELOW]
+      });
+      const label = w.getDomNode().querySelector('.remote-cursor-label');
+      if (label && label.textContent !== name) label.textContent = name;
+      editor.layoutContentWidget(w);
+      remoteCursors[peerId].decorationIds = newDecs;
+      remoteCursors[peerId].line = safeLine;
+      remoteCursors[peerId].col = safeCol;
+      remoteCursors[peerId].lastSeen = Date.now();
+    }
+  }
+
+  function removeRemoteCursor(peerId) {
+    if (!remoteCursors[peerId]) return;
+    if (state.monacoInstance) {
+      try {
+        state.monacoInstance.deltaDecorations(remoteCursors[peerId].decorationIds, []);
+        state.monacoInstance.removeContentWidget(remoteCursors[peerId].widget);
+      } catch (e) {}
+    }
+    const s = document.getElementById('peer-style-' + peerId);
+    if (s) s.remove();
+    delete remoteCursors[peerId];
+  }
+
+  function broadcastCursor(line, col) {
+    state.cursorLine = line;
+    state.cursorCol = col;
+
+    // Instant local broadcast to other tabs on same machine (0ms)
+    if (state.broadcastChannel) {
+      state.broadcastChannel.postMessage({
+        type: 'CURSOR',
+        from: state.userId,
+        name: state.userName,
+        color: state.userColor,
+        line,
+        col
+      });
+    }
+
+    // Network broadcast to remote collaborators via Firebase
+    clearTimeout(cursorThrottleTimer);
+    cursorThrottleTimer = setTimeout(() => {
+      if (!state.roomId) return;
+      const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/presence/' + state.userId + '.json';
+      fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ts: Date.now(),
+          name: state.userName,
+          color: state.userColor,
+          line,
+          col
+        })
+      }).catch(() => {});
+    }, 150);
   }
 
   function fallbackTextareaEditor(initial) {
@@ -521,6 +708,9 @@
         if (!m || m.from === state.userId) return;
         if (m.type === 'CODE' && m.roomId === roomId) applyRemote(m.code);
         if (m.type === 'PRESENCE') pollPresence(roomId);
+        if (m.type === 'CURSOR') {
+          renderRemoteCursor(m.from, m.name || 'Anonymous', m.color || '#10b981', m.line, m.col);
+        }
       };
     } catch (e) {}
 
@@ -572,7 +762,7 @@
   }
 
   // ──────────────────────────────────────────────
-  // PRESENCE HEARTBEAT
+  // PRESENCE & CURSOR HEARTBEAT
   // ──────────────────────────────────────────────
   function presenceStart(roomId) {
     if (state.presenceTimer) clearInterval(state.presenceTimer);
@@ -581,7 +771,7 @@
     state.presenceTimer = setInterval(() => {
       presencePing(roomId);
       pollPresence(roomId);
-    }, 5000);
+    }, 4500);
   }
 
   function presencePing(roomId) {
@@ -589,7 +779,13 @@
     fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ts: Date.now() })
+      body: JSON.stringify({
+        ts: Date.now(),
+        name: state.userName,
+        color: state.userColor,
+        line: state.cursorLine,
+        col: state.cursorCol
+      })
     }).catch(() => {});
     if (state.broadcastChannel) {
       state.broadcastChannel.postMessage({ type: 'PRESENCE', from: state.userId });
@@ -602,9 +798,25 @@
       .then(map => {
         if (!map) { setOnline(1); return; }
         const now = Date.now();
-        // Count users who pinged within last 15s — no deletions, data stays safe
-        const active = Object.values(map).filter(v => v && (now - v.ts) < 15000).length;
-        setOnline(Math.max(1, active));
+        const activeEntries = Object.entries(map).filter(([uid, v]) => v && (now - v.ts) < 20000);
+        setOnline(Math.max(1, activeEntries.length));
+
+        // Render collaborative cursors for active remote users (Screenshot 3 style)
+        const activeUids = new Set();
+        activeEntries.forEach(([uid, data]) => {
+          if (uid === state.userId) return;
+          activeUids.add(uid);
+          if (data && data.line) {
+            renderRemoteCursor(uid, data.name || 'Anonymous', data.color || '#10b981', data.line, data.col || 1);
+          }
+        });
+
+        // Clean up cursors for disconnected peers
+        Object.keys(remoteCursors).forEach(uid => {
+          if (!activeUids.has(uid)) {
+            removeRemoteCursor(uid);
+          }
+        });
       })
       .catch(() => setOnline(1));
   }
@@ -880,16 +1092,31 @@
     toast('Downloaded ' + fname, 'success');
   });
 
+  // Modal helpers — guaranteed to open/close cleanly
+  function openModal(m) {
+    if (!m) return;
+    m.classList.remove('hidden');
+    m.style.display = 'flex';
+  }
+  function closeModal(m) {
+    if (!m) return;
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    m.style.display = 'none';
+  }
+
   // Settings
   if (btnOpenSettings) btnOpenSettings.addEventListener('click', () => {
     if (el.settingFontsize) el.settingFontsize.value = state.settings.fontSize;
     if (el.settingTabsize)  el.settingTabsize.value  = state.settings.tabSize;
     if (el.settingWordwrap) el.settingWordwrap.checked = state.settings.wordWrap;
     if (el.settingSound)   el.settingSound.checked   = state.settings.sound;
-    if (el.modalSettings) { el.modalSettings.classList.remove('hidden'); el.modalSettings.classList.add('flex'); }
+    openModal(el.modalSettings);
   });
-  if (btnCloseSettings) btnCloseSettings.addEventListener('click', () => {
-    if (el.modalSettings) el.modalSettings.classList.add('hidden');
+  if (btnCloseSettings) btnCloseSettings.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeModal(el.modalSettings);
   });
   if (btnSaveSettings) btnSaveSettings.addEventListener('click', () => {
     state.settings.fontSize = parseInt(el.settingFontsize.value, 10);
@@ -907,20 +1134,32 @@
         wordWrap: state.settings.wordWrap ? 'on' : 'off'
       });
     }
-    if (el.modalSettings) el.modalSettings.classList.add('hidden');
+    closeModal(el.modalSettings);
     toast('Settings saved!', 'success');
   });
 
   // Share Modal
   if (btnModalCopyLink) btnModalCopyLink.addEventListener('click', copyLink);
-  if (btnModalDone)     btnModalDone.addEventListener('click', () => { if (el.modalShare) el.modalShare.classList.add('hidden'); });
-  if (btnCloseShare)    btnCloseShare.addEventListener('click', () => { if (el.modalShare) el.modalShare.classList.add('hidden'); });
+  if (btnModalDone)     btnModalDone.addEventListener('click', () => closeModal(el.modalShare));
+  if (btnCloseShare)    btnCloseShare.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeModal(el.modalShare);
+  });
 
   // Modal Backdrop Dismiss
   [el.modalSettings, el.modalShare].forEach(modal => {
     if (modal) modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.add('hidden');
+      if (e.target === modal) closeModal(modal);
     });
+  });
+
+  // Keyboard Escape Dismiss
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeModal(el.modalSettings);
+      closeModal(el.modalShare);
+    }
   });
 
   // ──────────────────────────────────────────────

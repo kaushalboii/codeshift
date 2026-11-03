@@ -57,16 +57,20 @@
       color: #f0fbfd;
       font-family: 'Inter', sans-serif;
     }
+
     #landing-page::-webkit-scrollbar {
       width: 7px;
     }
+
     #landing-page::-webkit-scrollbar-track {
       background: #06131a;
     }
+
     #landing-page::-webkit-scrollbar-thumb {
       background: #143542;
       border-radius: 4px;
     }
+
     #landing-page::-webkit-scrollbar-thumb:hover {
       background: #255869;
     }
@@ -91,12 +95,7 @@
       inset: 0;
       pointer-events: none;
       z-index: 2;
-      background: radial-gradient(
-        ellipse at 50% 25%,
-        rgba(2, 16, 20, 0.04) 0%,
-        rgba(2, 16, 20, 0.20) 55%,
-        rgba(2, 14, 18, 0.48) 100%
-      );
+      background: radial-gradient(ellipse at 50% 25%,
     }
 
     /* Nav */
@@ -113,6 +112,7 @@
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
     }
+
     .landing-brand {
       display: flex;
       align-items: center;
@@ -120,12 +120,14 @@
       text-decoration: none;
       user-select: none;
     }
+
     .landing-brand-text {
       font-size: 19px;
       font-weight: 800;
       color: #f0fbfd;
       letter-spacing: -0.5px;
     }
+
     .landing-brand-shift {
       background: linear-gradient(135deg, #7ce2ee 0%, #4ecdc4 100%);
       -webkit-background-clip: text;
@@ -183,10 +185,9 @@
       padding: 30px 24px 36px 24px;
       text-align: center;
       min-height: calc(100vh - 110px);
-    }
+
     .landing-tagline {
       display: inline-flex;
-      align-items: center;
       gap: 8px;
       font-size: 11px;
       font-weight: 700;
@@ -200,17 +201,26 @@
       margin-bottom: 18px;
       backdrop-filter: blur(10px);
     }
-    .landing-tagline-dot {
+
       width: 7px;
       height: 7px;
-      border-radius: 50%;
       background: #4ecdc4;
       box-shadow: 0 0 10px #4ecdc4;
       animation: livePulse 2s ease-in-out infinite;
     }
+
     @keyframes livePulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.35; transform: scale(0.85); }
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.35;
+        transform: scale(0.85);
+      }
     }
 
     .landing-headline {
@@ -222,14 +232,12 @@
       letter-spacing: -1.5px;
       max-width: 680px;
       margin-bottom: 12px;
-    }
     .landing-headline .hl {
       background: linear-gradient(135deg, #a8ecf5 0%, #7ce2ee 50%, #4ecdc4 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       text-shadow: 0 0 35px rgba(124, 226, 238, 0.25);
     }
-
     .landing-sub {
       font-size: 14.5px;
       font-weight: 400;
@@ -240,13 +248,9 @@
     }
 
     /* Code preview card */
-    .code-card {
       background: rgba(8, 25, 33, 0.78);
       border-radius: 12px;
       padding: 16px 20px;
-      margin-top: 14px;
-      margin-bottom: 10px;
-      max-width: 480px;
       width: 100%;
       text-align: left;
       border: 1px solid rgba(124, 226, 238, 0.18);
@@ -254,31 +258,51 @@
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
     }
-    .code-dots {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 14px;
-    }
+
     .code-dot {
       width: 10px;
       height: 10px;
       border-radius: 50%;
     }
-    .code-dot.r { background: #ff5f57; }
-    .code-dot.y { background: #ffbd2e; }
-    .code-dot.g { background: #28c840; }
 
-    .code-line {
+    .code-dot.r {
+      background: #ff5f57;
+    }
+
+    .code-dot.y {
+      background: #ffbd2e;
+    }
+
+    .code-dot.g {
+      background: #28c840;
+    }
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
       line-height: 1.9;
       white-space: pre;
     }
-    .t-cmt { color: #436977; }
-    .t-kw  { color: #7ce2ee; font-weight: 600; }
-    .t-fn  { color: #a5d8ff; }
-    .t-str { color: #5eead4; }
-    .t-p   { color: #8da6b0; }
+
+    .t-cmt {
+      color: #436977;
+    }
+
+    .t-kw {
+      color: #7ce2ee;
+      font-weight: 600;
+    }
+
+    .t-fn {
+      color: #a5d8ff;
+    }
+
+    .t-str {
+      color: #5eead4;
+    }
+
+    .t-p {
+      color: #8da6b0;
+    }
+
     .t-cursor {
       display: inline-block;
       width: 7px;
@@ -287,7 +311,18 @@
       vertical-align: bottom;
       animation: cBlink 1.1s step-end infinite;
     }
-    @keyframes cBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    @keyframes cBlink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
+    }
 
     /* Room input form */
     .room-form {
@@ -298,6 +333,7 @@
       width: 100%;
       margin-bottom: 14px;
     }
+
     .room-prefix {
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
@@ -306,6 +342,7 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
+
     .room-input {
       flex: 1;
       background: rgba(10, 31, 40, 0.85);
@@ -319,14 +356,17 @@
       transition: all 0.2s ease;
       backdrop-filter: blur(10px);
     }
+
     .room-input::placeholder {
       color: #557985;
     }
+
     .room-input:focus {
       border-color: #7ce2ee;
       box-shadow: 0 0 0 3px rgba(124, 226, 238, 0.22), 0 0 20px rgba(124, 226, 238, 0.15);
       background: rgba(14, 40, 52, 0.95);
     }
+
     .room-go-btn {
       background: linear-gradient(135deg, #1b6676 0%, #3ca2b2 100%);
       color: #f0fbfd;
@@ -341,15 +381,18 @@
       transition: all 0.2s ease;
       box-shadow: 0 4px 18px rgba(60, 162, 178, 0.35);
     }
+
     .room-go-btn:hover {
       background: linear-gradient(135deg, #248194 0%, #4ecdc4 100%);
       transform: translateY(-1px);
       box-shadow: 0 6px 26px rgba(78, 205, 196, 0.50);
     }
+
     .room-hint {
       font-size: 12.5px;
       color: #6a919e;
     }
+
     .room-hint span {
       color: #7ce2ee;
       cursor: pointer;
@@ -357,6 +400,7 @@
       text-decoration-color: rgba(124, 226, 238, 0.4);
       transition: color 0.15s;
     }
+
     .room-hint span:hover {
       color: #a8ecf5;
     }
@@ -368,25 +412,30 @@
       .landing-nav {
         padding: 12px 18px;
       }
+
       .landing-hero {
         padding: 24px 16px 40px 16px;
         min-height: calc(100dvh - 100px);
       }
+
       .landing-headline {
         font-size: clamp(26px, 7.5vw, 42px);
         letter-spacing: -0.8px;
         margin-bottom: 12px;
       }
+
       .landing-sub {
         font-size: 14px;
         line-height: 1.6;
         margin-bottom: 24px;
       }
+
       .code-card {
         padding: 14px 16px;
         margin-top: 14px;
         margin-bottom: 14px;
       }
+
       .code-line {
         font-size: 11px;
         line-height: 1.7;
@@ -398,28 +447,34 @@
       .landing-nav {
         padding: 10px 14px;
       }
+
       .landing-brand-text {
         font-size: 17px;
       }
+
       .room-form {
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
       }
+
       .room-prefix {
         display: none;
       }
+
       .room-input {
         width: 100%;
-        font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+        font-size: 16px;
+        /* Prevents auto-zoom on iOS Safari */
         padding: 12px 14px;
         text-align: center;
       }
+
       .room-go-btn {
         width: 100%;
         padding: 12px 0;
         font-size: 14px;
       }
+
       .landing-tagline {
         font-size: 10px;
         padding: 4px 12px;
@@ -618,6 +673,7 @@
       position: relative;
       z-index: 10;
     }
+
     #editor-page.hidden {
       display: none !important;
     }
@@ -670,21 +726,15 @@
       </h1>
 
       <p class="landing-sub">
-        Open a room, share the URL. Anyone with the link can view and edit your code in real-time — end-to-end encrypted, zero login, zero friction.
+        Open a room, share the URL. Anyone with the link can view and edit your code in real-time — end-to-end
+        encrypted, zero login, zero friction.
       </p>
 
       <!-- Room input - Primary CTA front and center -->
       <div class="room-form">
         <span class="room-prefix">codeshift.io/</span>
-        <input
-          id="landing-room-input"
-          class="room-input"
-          type="text"
-          placeholder="your-room-name"
-          maxlength="64"
-          autocomplete="off"
-          spellcheck="false"
-        >
+        <input id="landing-room-input" class="room-input" type="text" placeholder="your-room-name" maxlength="64"
+          autocomplete="off" spellcheck="false">
         <button id="landing-open-btn" class="room-go-btn">Open →</button>
       </div>
       <p class="room-hint">or <span id="landing-random-btn">open a random room instantly</span></p>
@@ -807,16 +857,16 @@
         </div>
 
         <div class="header-right">
-          <button id="btn-share-room" class="btn-coral-share">
-            <span>📋</span><span>Copy Link</span>
+          <button id="btn-share-room" class="btn-game-bw" title="Share room URL">
+            <span>🔗</span><span>Share</span>
           </button>
-          <button id="btn-create-new-room" class="btn-subtle-action">
+          <button id="btn-create-new-room" class="btn-game-bw" title="Create clean room">
             <span>➕</span><span>New</span>
           </button>
-          <button id="btn-download-code" class="btn-subtle-action">
+          <button id="btn-download-code" class="btn-game-bw" title="Export file">
             <span>⬇️</span><span>Export</span>
           </button>
-          <button id="btn-open-settings" class="btn-icon-rail" title="Preferences">
+          <button id="btn-open-settings" class="btn-game-bw btn-game-icon" title="Preferences">
             <span>⚙️</span>
           </button>
         </div>
@@ -895,7 +945,8 @@
         <button id="btn-close-share" class="modal-close-btn">✕</button>
       </div>
       <div class="modal-content">
-        <p class="modal-description">Anyone with this link can view and edit in real-time. End-to-end encrypted, zero login.</p>
+        <p class="modal-description">Anyone with this link can view and edit in real-time. End-to-end encrypted, zero
+          login.</p>
         <div style="display:flex;gap:8px;">
           <input type="text" id="input-share-link" class="form-input" style="font-family:var(--cs-font-mono);" readonly>
           <button id="btn-modal-copy-link" class="btn-primary" style="white-space:nowrap;">Copy</button>
