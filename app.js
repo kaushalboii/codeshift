@@ -4,10 +4,11 @@
  *
  * Features:
  * - Instant distraction-free mesh-type code editor
+ * - Fresh rooms start completely empty (no boilerplate code)
+ * - Custom room names in URL (e.g. #/kaushal)
  * - Keystroke auto-save with visual indicator (● Saved / ● Saving...)
- * - Serverless multi-device cloud persistence (Firebase Realtime Database)
+ * - Silent background cloud persistence via Firebase Realtime Database
  * - Direct WebRTC peer-to-peer sync (PeerJS)
- * - Native Node.js RFC 6455 WebSocket integration (server.js)
  * - Monaco Editor (VS Code engine) with full multi-language syntax highlighting
  * - Zero signup, instant 1-click link sharing
  */
@@ -21,15 +22,16 @@
     userId: localStorage.getItem('codeshare_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
     userName: localStorage.getItem('codeshare_user_name') || 'Kaushal',
     userColor: localStorage.getItem('codeshare_user_color') || getRandomColor(),
-    firebaseUrl: localStorage.getItem('codeshare_firebase_url') || 'https://codeshift-realtimedb-default-rtdb.firebaseio.com',
+    firebaseUrl: 'https://codeshift-realtimedb-default-rtdb.firebaseio.com',
     serverUrl: localStorage.getItem('codeshift_ws_server') || (window.CODESHIFT_WS_SERVER || ''),
     language: localStorage.getItem('codeshare_default_lang') || 'javascript',
     isHost: false,
-    peers: new Map(), // peerId -> { userId, userName, userColor }
+    peers: new Map(),
     peerJsInstance: null,
     peerConnections: new Map(),
     firebaseApp: null,
     firebaseDb: null,
+    currentRoomRef: null,
     ws: null,
     wsConnected: false,
     broadcastChannel: null,
@@ -48,113 +50,19 @@
   localStorage.setItem('codeshare_user_id', state.userId);
   localStorage.setItem('codeshare_user_color', state.userColor);
 
+  // Fresh rooms start completely empty (like Codeshare)
   const DEFAULT_TEMPLATES = {
-    javascript: `// CodeShare • Real-time Collaborative Code Workspace
-// Auto-saves on every keystroke. Share the URL to collaborate instantly!
-
-function calculatePrimes(max) {
-  const primes = [];
-  for (let i = 2; i <= max; i++) {
-    let isPrime = true;
-    for (let j = 2; j <= Math.sqrt(i); j++) {
-      if (i % j === 0) { isPrime = false; break; }
-    }
-    if (isPrime) primes.push(i);
-  }
-  return primes;
-}
-
-console.log("Primes up to 50:", calculatePrimes(50));
-`,
-    typescript: `// CodeShare • TypeScript Environment
-interface SessionConfig {
-  roomId: string;
-  collaborators: number;
-  autoSave: boolean;
-}
-
-const activeSession: SessionConfig = {
-  roomId: "${state.roomId || 'demo'}",
-  collaborators: 2,
-  autoSave: true
-};
-
-console.log("TypeScript session loaded:", activeSession);
-`,
-    python: `# CodeShare • Python Workspace
-# Auto-saved and synchronized across all connected devices in real time.
-
-def fibonacci(n):
-    sequence = [0, 1]
-    while len(sequence) < n:
-        sequence.append(sequence[-1] + sequence[-2])
-    return sequence
-
-print("Fibonacci sequence:", fibonacci(10))
-`,
-    html: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>CodeShare Interactive HTML</title>
-  <style>
-    body { background: #0d0f15; color: #f8fafc; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
-    .card { background: #161a24; border: 1px solid #eb4d4b; padding: 28px; border-radius: 8px; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>CodeShare Real-Time Editor</h1>
-    <p>Live synchronized HTML & CSS rendered across devices.</p>
-  </div>
-</body>
-</html>`,
-    css: `/* CodeShare CSS Styling */
-:root {
-  --coral-accent: #eb4d4b;
-  --dark-canvas: #0d0f15;
-}
-
-.code-container {
-  font-family: 'JetBrains Mono', monospace;
-  background: var(--dark-canvas);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 16px;
-  border-radius: 6px;
-}`,
-    json: `{
-  "service": "CodeShare",
-  "realtime": true,
-  "cloudPersistence": "Firebase & WebRTC Ready",
-  "autoSave": "Instant Debounced Keystroke"
-}`,
-    sql: `-- CodeShare SQL Workspace
-SELECT 
-  room_id,
-  code_snippet,
-  collaborators_count,
-  last_updated
-FROM codeshare_sessions
-ORDER BY last_updated DESC;`,
-    rust: `// CodeShare Rust Environment
-fn main() {
-    let app = "CodeShare";
-    println!("Seamless real-time code sharing with {}!", app);
-}`,
-    go: `// CodeShare Go Environment
-package main
-import "fmt"
-
-func main() {
-    fmt.Println("CodeShare: Instant code sharing without login.")
-}`,
-    markdown: `# CodeShare Collaborative Document
-Share code in real-time with developers worldwide.
-- **Auto-Save**: Keystrokes are immediately saved.
-- **Seamless Sync**: Connect multiple computers via WebRTC & Firebase.
-- **One Link**: Send this link to anyone to code together.`,
-    plaintext: `CodeShare — Simple, instant code sharing.
-Type or paste anything here. It auto-saves instantly.`
+    javascript: '',
+    typescript: '',
+    python: '',
+    html: '',
+    css: '',
+    json: '',
+    sql: '',
+    rust: '',
+    go: '',
+    markdown: '',
+    plaintext: ''
   };
 
   function getRandomColor() {
@@ -174,10 +82,10 @@ Type or paste anything here. It auto-saves instantly.`
       gain.connect(audioCtx.destination);
       const now = audioCtx.currentTime;
       osc.frequency.setValueAtTime(600, now);
-      gain.gain.setValueAtTime(0.02, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      gain.gain.setValueAtTime(0.015, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
       osc.start(now);
-      osc.stop(now + 0.04);
+      osc.stop(now + 0.03);
     } catch (e) {}
   }
 
@@ -215,6 +123,7 @@ Type or paste anything here. It auto-saves instantly.`
     roomNavId: document.getElementById('room-nav-id'),
     btnCopyRoomLink: document.getElementById('btn-copy-room-link'),
     btnShareRoom: document.getElementById('btn-share-room'),
+    btnCreateNewRoom: document.getElementById('btn-create-new-room'),
     btnHeroLaunchRoom: document.getElementById('btn-hero-launch-room'),
     saveStatusContainer: document.getElementById('save-status-container'),
     saveStatusDot: document.getElementById('save-status-dot'),
@@ -223,8 +132,6 @@ Type or paste anything here. It auto-saves instantly.`
     onlineUsersCount: document.getElementById('online-users-count'),
     userNicknameDisplay: document.getElementById('user-nickname-display'),
     btnChangeNickname: document.getElementById('btn-change-nickname'),
-    btnOpenCloudSync: document.getElementById('btn-open-cloud-sync'),
-    cloudSyncBadge: document.getElementById('cloud-sync-badge'),
     btnOpenSettings: document.getElementById('btn-open-settings'),
     btnDownloadCode: document.getElementById('btn-download-code'),
     btnToggleFullscreen: document.getElementById('btn-toggle-fullscreen'),
@@ -243,13 +150,6 @@ Type or paste anything here. It auto-saves instantly.`
     btnModalCopyLink: document.getElementById('btn-modal-copy-link'),
     btnModalDoneShare: document.getElementById('btn-modal-done-share'),
     btnCloseShare: document.getElementById('btn-close-share'),
-    modalCloudSync: document.getElementById('modal-cloud-sync'),
-    inputFirebaseUrl: document.getElementById('input-firebase-url'),
-    settingServerUrl: document.getElementById('setting-server-url'),
-    btnSaveCloudSync: document.getElementById('btn-save-cloud-sync'),
-    btnTestServerPing: document.getElementById('btn-test-server-ping'),
-    btnCloseCloudSync: document.getElementById('btn-close-cloud-sync'),
-    syncDiagnostics: document.getElementById('sync-diagnostics'),
     modalSettings: document.getElementById('modal-settings'),
     settingFontsize: document.getElementById('setting-fontsize'),
     settingTabsize: document.getElementById('setting-tabsize'),
@@ -270,44 +170,18 @@ Type or paste anything here. It auto-saves instantly.`
   }
 
   function handleRoute() {
-    // 1. Check for parameters (e.g. server, fb, lang)
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.get('fb')) {
-        state.firebaseUrl = searchParams.get('fb');
-        localStorage.setItem('codeshare_firebase_url', state.firebaseUrl);
-      }
-      if (searchParams.get('server')) {
-        state.serverUrl = searchParams.get('server');
-        localStorage.setItem('codeshift_ws_server', state.serverUrl);
-      }
-    } catch (e) {}
-
     const rawHash = (window.location.hash || '').slice(1);
-    const [pathPart, queryPart] = rawHash.split('?');
-    if (queryPart) {
-      try {
-        const hashParams = new URLSearchParams(queryPart);
-        if (hashParams.get('fb')) {
-          state.firebaseUrl = hashParams.get('fb');
-          localStorage.setItem('codeshare_firebase_url', state.firebaseUrl);
-        }
-        if (hashParams.get('server')) {
-          state.serverUrl = hashParams.get('server');
-          localStorage.setItem('codeshift_ws_server', state.serverUrl);
-        }
-      } catch (e) {}
-    }
-
+    const [pathPart, _] = rawHash.split('?');
     const cleanPath = (pathPart || '').replace(/^\/+/, '').trim();
 
-    // If root or new, generate instant room slug
+    // If root or new, generate instant room slug (e.g. /#/room-8x2a)
     if (!cleanPath || cleanPath === 'new') {
       const newSlug = generateRoomSlug();
       window.location.hash = `/${newSlug}`;
       return;
     }
 
+    // Support /#/kaushal or /#/room/kaushal
     const roomId = cleanPath.startsWith('room/') ? cleanPath.slice(5) : cleanPath;
     enterRoom(decodeURIComponent(roomId));
   }
@@ -321,7 +195,7 @@ Type or paste anything here. It auto-saves instantly.`
     if (el.userNicknameDisplay) el.userNicknameDisplay.textContent = `(${state.userName})`;
     document.title = `CodeShare • /${roomId}`;
 
-    // Load cached code from localStorage if available
+    // Load cached code from localStorage if available, otherwise start clean
     const cachedCode = localStorage.getItem(`cs_code_${roomId}`);
     const cachedLang = localStorage.getItem(`cs_lang_${roomId}`);
     if (cachedLang) {
@@ -329,29 +203,38 @@ Type or paste anything here. It auto-saves instantly.`
       if (el.selectLanguage) el.selectLanguage.value = cachedLang;
     }
 
-    const initialCode = cachedCode !== null ? cachedCode : (DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript);
+    const initialCode = cachedCode !== null ? cachedCode : '';
 
     // Initialize Monaco Editor
     initMonacoEditor(initialCode);
 
     // Initialize Real-Time Synchronization Engines:
-    // 1. Firebase Realtime Database
+    // 1. Firebase Realtime Database (Silent Cloud Persistence)
     initFirebaseSync(roomId);
     // 2. Direct WebRTC Peer Sync (PeerJS)
     initPeerSync(roomId);
     // 3. Native WebSocket Server (if running)
     connectWebSocket(roomId);
 
-    updateSaveIndicator('saved', 'Auto-Save Ready');
-    showToast(`Connected to room /${roomId}`, 'info');
+    updateSaveIndicator('saved', 'Saved');
+  }
+
+  function sanitizeFirebaseKey(key) {
+    return (key || 'default').replace(/[.#$\[\]\/]/g, '_');
   }
 
   function navigateToRoom(roomId) {
     window.location.hash = `/${encodeURIComponent(roomId)}`;
   }
 
+  function getRoomShareUrl(roomId) {
+    let base = window.location.origin + window.location.pathname;
+    if (!base.endsWith('/')) base += '/';
+    return `${base}#/${encodeURIComponent(roomId || state.roomId)}`;
+  }
+
   function generateRoomSlug() {
-    const prefixes = ['knot', 'pair', 'flow', 'dev', 'shift', 'sync', 'hack', 'code'];
+    const prefixes = ['dev', 'code', 'room', 'pair', 'flow'];
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
     const num = Math.random().toString(36).substring(2, 6);
     return `${prefix}-${num}`;
@@ -389,8 +272,10 @@ Type or paste anything here. It auto-saves instantly.`
           const container = el.monacoContainer;
           container.innerHTML = '';
 
+          const codeToLoad = (getEditorCode() !== '') ? getEditorCode() : initialCode;
+
           state.monacoInstance = monaco.editor.create(container, {
-            value: initialCode,
+            value: codeToLoad,
             language: mapLanguageToMonaco(state.language),
             theme: 'codeshare-mesh',
             automaticLayout: true,
@@ -495,23 +380,25 @@ Type or paste anything here. It auto-saves instantly.`
 
   function getEditorCode() {
     if (state.monacoInstance) return state.monacoInstance.getValue();
-    return el.editorTextarea.value;
+    return el.editorTextarea ? el.editorTextarea.value : '';
   }
 
   function setEditorCode(code) {
     state.isApplyingRemoteChange = true;
     if (state.monacoInstance) {
       const position = state.monacoInstance.getPosition();
+      const scrollTop = state.monacoInstance.getScrollTop();
       state.monacoInstance.setValue(code);
       if (position) state.monacoInstance.setPosition(position);
+      if (scrollTop) state.monacoInstance.setScrollTop(scrollTop);
     } else {
-      el.editorTextarea.value = code;
+      if (el.editorTextarea) el.editorTextarea.value = code;
       updateLineNumbers();
     }
     updateCodeStats();
     setTimeout(() => {
       state.isApplyingRemoteChange = false;
-    }, 100);
+    }, 80);
   }
 
   function updateLineNumbers() {
@@ -555,18 +442,18 @@ Type or paste anything here. It auto-saves instantly.`
 
       // 2. Save to Firebase Realtime Database
       if (state.firebaseDb && state.roomId) {
-        state.firebaseDb.ref('codeshare_rooms/' + state.roomId).update({
+        state.firebaseDb.ref('codeshare_rooms/' + sanitizeFirebaseKey(state.roomId)).set({
           code: code,
           language: state.language,
           author: state.userName,
           updatedAt: Date.now()
         }).then(() => {
-          updateSaveIndicator('saved', 'Saved in Cloud (Firebase)');
+          updateSaveIndicator('saved', 'Saved');
         }).catch(() => {
-          updateSaveIndicator('saved', 'Saved Locally');
+          updateSaveIndicator('saved', 'Saved');
         });
       } else {
-        updateSaveIndicator('saved', 'Saved Locally & Peers');
+        updateSaveIndicator('saved', 'Saved');
       }
 
       // 3. Broadcast to all WebRTC Peers
@@ -585,28 +472,29 @@ Type or paste anything here. It auto-saves instantly.`
         language: state.language
       });
 
-    }, 280);
+    }, 250);
   }
 
-  // --- 1. Firebase Realtime Database Engine ---
+  // --- 1. Firebase Realtime Database Engine (Silent Background Sync) ---
   function initFirebaseSync(roomId) {
-    const dbUrl = (state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || 'https://codeshift-realtimedb-default-rtdb.firebaseio.com').trim();
-    if (!dbUrl || typeof firebase === 'undefined') {
-      if (el.cloudSyncBadge) el.cloudSyncBadge.textContent = 'Cloud Sync (Setup)';
-      return;
-    }
+    const dbUrl = state.firebaseUrl;
+    if (!dbUrl || typeof firebase === 'undefined') return;
 
     try {
       if (!state.firebaseApp) {
         state.firebaseApp = firebase.initializeApp({ databaseURL: dbUrl }, 'cs_app_' + Date.now());
         state.firebaseDb = state.firebaseApp.database();
-        if (el.cloudSyncBadge) el.cloudSyncBadge.textContent = 'Firebase Synced 🟢';
       }
 
-      const roomRef = state.firebaseDb.ref('codeshare_rooms/' + roomId);
+      // Detach any previous room listener
+      if (state.currentRoomRef) {
+        state.currentRoomRef.off();
+      }
+
+      state.currentRoomRef = state.firebaseDb.ref('codeshare_rooms/' + sanitizeFirebaseKey(roomId));
 
       // Listen for remote updates
-      roomRef.on('value', (snapshot) => {
+      state.currentRoomRef.on('value', (snapshot) => {
         const val = snapshot.val();
         if (val && val.code !== undefined && !state.isApplyingRemoteChange) {
           if (val.code !== getEditorCode()) {
@@ -616,7 +504,7 @@ Type or paste anything here. It auto-saves instantly.`
               el.selectLanguage.value = val.language;
               updateLanguageInMonaco(val.language);
             }
-            updateSaveIndicator('saved', 'Synced with Cloud');
+            updateSaveIndicator('saved', 'Saved');
           }
         }
       });
@@ -636,9 +524,8 @@ Type or paste anything here. It auto-saves instantly.`
       const peer = new Peer(myPeerId, { debug: 0 });
       state.peerJsInstance = peer;
 
-      peer.on('open', (id) => {
+      peer.on('open', () => {
         updatePeerCounter();
-        // Try connecting to known room host / peers
         const targetHostId = `cs_${roomId}_host`;
         if (myPeerId !== targetHostId) {
           const conn = peer.connect(targetHostId);
@@ -651,7 +538,6 @@ Type or paste anything here. It auto-saves instantly.`
       });
 
       peer.on('error', (err) => {
-        // If ID taken, register as guest peer
         if (err.type === 'unavailable-id') {
           const guestId = `cs_${roomId}_g_${Math.random().toString(36).substring(2, 6)}`;
           state.peerJsInstance = new Peer(guestId, { debug: 0 });
@@ -668,7 +554,6 @@ Type or paste anything here. It auto-saves instantly.`
       state.peerConnections.set(conn.peer, conn);
       updatePeerCounter();
 
-      // Send initial document state to new peer
       conn.send({
         type: 'SYNC_DOC',
         code: getEditorCode(),
@@ -688,7 +573,7 @@ Type or paste anything here. It auto-saves instantly.`
             el.selectLanguage.value = data.language;
             updateLanguageInMonaco(data.language);
           }
-          updateSaveIndicator('saved', `Synced from ${data.userName || 'peer'}`);
+          updateSaveIndicator('saved', 'Saved');
         }
       }
     });
@@ -710,10 +595,7 @@ Type or paste anything here. It auto-saves instantly.`
   function updatePeerCounter() {
     const count = 1 + state.peerConnections.size;
     if (el.onlineUsersCount) {
-      el.onlineUsersCount.textContent = `${count} ${count === 1 ? 'user' : 'users'} online`;
-    }
-    if (el.syncStatus) {
-      el.syncStatus.textContent = count > 1 ? `Peer Mesh Connected (${count})` : 'Mesh Ready (Share link to pair)';
+      el.onlineUsersCount.textContent = `${count} online`;
     }
   }
 
@@ -750,10 +632,6 @@ Type or paste anything here. It auto-saves instantly.`
 
     try {
       state.ws = new WebSocket(wsUrl);
-      state.ws.onopen = () => {
-        state.wsConnected = true;
-        if (el.syncStatus) el.syncStatus.textContent = 'Live Server WebSocket ⚡';
-      };
       state.ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
@@ -765,7 +643,7 @@ Type or paste anything here. It auto-saves instantly.`
                 el.selectLanguage.value = msg.language;
                 updateLanguageInMonaco(msg.language);
               }
-              updateSaveIndicator('saved', 'Synced from Server');
+              updateSaveIndicator('saved', 'Saved');
             }
           }
         } catch (e) {}
@@ -800,71 +678,59 @@ Type or paste anything here. It auto-saves instantly.`
       const msg = event.data;
       if (msg && msg.type === 'SYNC_DOC' && msg.code !== getEditorCode()) {
         setEditorCode(msg.code);
-        updateSaveIndicator('saved', 'Synced (Local Tab)');
+        updateSaveIndicator('saved', 'Saved');
       }
     };
   }
 
-  // --- Share Link Helper ---
-  function openShareModal() {
-    let url = window.location.href;
-    const fbUrl = state.firebaseUrl || localStorage.getItem('codeshare_firebase_url');
-    if (fbUrl && !url.includes('fb=')) {
-      const sep = url.includes('?') ? '&' : '?';
-      url = `${url}${sep}fb=${encodeURIComponent(fbUrl)}`;
-    }
-
-    if (el.inputShareLink) el.inputShareLink.value = url;
-    if (el.modalShare) {
-      el.modalShare.classList.remove('hidden');
-      el.modalShare.classList.add('flex');
-      if (el.inputShareLink) el.inputShareLink.select();
-    }
-
+  // --- 1-Click Copy Link Function ---
+  function copyShareLink() {
+    const fullUrl = getRoomShareUrl();
+    
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        showToast('Room link copied! Share with collaborators 📋', 'success');
-      }).catch(() => {});
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        showToast('Room link copied! Share with anyone 📋', 'success');
+      }).catch(() => {
+        prompt('Copy this room URL:', fullUrl);
+      });
+    } else {
+      prompt('Copy this room URL:', fullUrl);
     }
+
+    // Also update modal if opened
+    if (el.inputShareLink) el.inputShareLink.value = fullUrl;
   }
 
   // --- Event Bindings ---
-  // 1. Share & Copy
-  if (el.btnShareRoom) el.btnShareRoom.addEventListener('click', openShareModal);
-  if (el.btnCopyRoomLink) el.btnCopyRoomLink.addEventListener('click', openShareModal);
+  // 1. Share & Copy Link Button
+  if (el.btnShareRoom) el.btnShareRoom.addEventListener('click', copyShareLink);
 
-  if (el.btnModalCopyLink) {
-    el.btnModalCopyLink.addEventListener('click', () => {
-      if (el.inputShareLink) {
-        el.inputShareLink.select();
-        navigator.clipboard.writeText(el.inputShareLink.value).then(() => {
-          showToast('Link copied to clipboard! 📋', 'success');
-          el.btnModalCopyLink.textContent = 'Copied!';
-          setTimeout(() => { if (el.btnModalCopyLink) el.btnModalCopyLink.textContent = 'Copy Link'; }, 2000);
-        });
+  // 2. Click Room Badge to copy or switch room
+  if (el.btnCopyRoomLink) {
+    el.btnCopyRoomLink.addEventListener('click', () => {
+      const currentName = state.roomId;
+      const targetRoom = prompt('Enter a room name to switch, or press Cancel to copy current link:', currentName);
+      if (targetRoom !== null && targetRoom.trim() && targetRoom.trim() !== currentName) {
+        navigateToRoom(targetRoom.trim());
+      } else {
+        copyShareLink();
       }
     });
   }
 
-  if (el.btnModalDoneShare) {
-    el.btnModalDoneShare.addEventListener('click', () => {
-      if (el.modalShare) el.modalShare.classList.add('hidden');
+  // 3. New Room Button
+  if (el.btnCreateNewRoom) {
+    el.btnCreateNewRoom.addEventListener('click', () => {
+      navigateToRoom(generateRoomSlug());
     });
   }
-  if (el.btnCloseShare) {
-    el.btnCloseShare.addEventListener('click', () => {
-      if (el.modalShare) el.modalShare.classList.add('hidden');
-    });
-  }
-
-  // 2. New Room
   if (el.btnHeroLaunchRoom) {
     el.btnHeroLaunchRoom.addEventListener('click', () => {
       navigateToRoom(generateRoomSlug());
     });
   }
 
-  // 3. Language Selector
+  // 4. Language Selector
   if (el.selectLanguage) {
     el.selectLanguage.addEventListener('change', (e) => {
       const lang = e.target.value;
@@ -872,79 +738,11 @@ Type or paste anything here. It auto-saves instantly.`
       localStorage.setItem('codeshare_default_lang', lang);
       updateLanguageInMonaco(lang);
       onLocalCodeChange(getEditorCode());
-      showToast(`Language set to ${e.target.options[e.target.selectedIndex].text}`);
+      showToast(`Language: ${e.target.options[e.target.selectedIndex].text}`);
     });
   }
 
-  // 4. Cloud Sync / Firebase Modal
-  if (el.btnOpenCloudSync) {
-    el.btnOpenCloudSync.addEventListener('click', () => {
-      if (el.inputFirebaseUrl) {
-        el.inputFirebaseUrl.value = state.firebaseUrl || localStorage.getItem('codeshare_firebase_url') || '';
-      }
-      if (el.settingServerUrl) {
-        el.settingServerUrl.value = state.serverUrl || localStorage.getItem('codeshift_ws_server') || '';
-      }
-      if (el.modalCloudSync) {
-        el.modalCloudSync.classList.remove('hidden');
-        el.modalCloudSync.classList.add('flex');
-      }
-    });
-  }
-
-  if (el.btnCloseCloudSync) {
-    el.btnCloseCloudSync.addEventListener('click', () => {
-      if (el.modalCloudSync) el.modalCloudSync.classList.add('hidden');
-    });
-  }
-
-  if (el.btnSaveCloudSync) {
-    el.btnSaveCloudSync.addEventListener('click', () => {
-      const fbUrl = el.inputFirebaseUrl ? el.inputFirebaseUrl.value.trim() : '';
-      const sUrl = el.settingServerUrl ? el.settingServerUrl.value.trim() : '';
-
-      state.firebaseUrl = fbUrl;
-      if (fbUrl) localStorage.setItem('codeshare_firebase_url', fbUrl);
-      else localStorage.removeItem('codeshare_firebase_url');
-
-      state.serverUrl = sUrl;
-      if (sUrl) localStorage.setItem('codeshift_ws_server', sUrl);
-      else localStorage.removeItem('codeshift_ws_server');
-
-      if (state.roomId) {
-        initFirebaseSync(state.roomId);
-        connectWebSocket(state.roomId);
-      }
-
-      if (el.modalCloudSync) el.modalCloudSync.classList.add('hidden');
-      showToast('Cloud database configuration saved!', 'success');
-    });
-  }
-
-  if (el.btnTestServerPing) {
-    el.btnTestServerPing.addEventListener('click', async () => {
-      const fbUrl = (el.inputFirebaseUrl.value || '').trim();
-      if (!fbUrl) {
-        showToast('Please enter a Firebase Database URL to test', 'error');
-        return;
-      }
-      try {
-        el.btnTestServerPing.textContent = 'Testing...';
-        const testRes = await fetch(`${fbUrl.replace(/\/$/, '')}/.json?shallow=true`, { method: 'GET' });
-        if (testRes.ok) {
-          showToast('Firebase Realtime Database reachable! ⚡', 'success');
-        } else {
-          showToast(`Firebase test responded with HTTP ${testRes.status}`, 'error');
-        }
-      } catch (e) {
-        showToast('Connection failed: ' + e.message, 'error');
-      } finally {
-        el.btnTestServerPing.textContent = 'Test Connection';
-      }
-    });
-  }
-
-  // 5. Settings / Preferences
+  // 5. Settings / Preferences Modal
   if (el.btnOpenSettings) {
     el.btnOpenSettings.addEventListener('click', () => {
       if (el.settingFontsize) el.settingFontsize.value = state.settings.fontSize;
@@ -1015,7 +813,7 @@ Type or paste anything here. It auto-saves instantly.`
         localStorage.setItem('codeshare_user_name', newName);
         if (el.userNicknameDisplay) el.userNicknameDisplay.textContent = `(${newName})`;
         if (el.modalNickname) el.modalNickname.classList.add('hidden');
-        showToast(`Display name set to "${newName}"`, 'success');
+        showToast(`Name set to "${newName}"`, 'success');
       }
     });
   }
@@ -1025,7 +823,7 @@ Type or paste anything here. It auto-saves instantly.`
     el.btnDownloadCode.addEventListener('click', () => {
       const extMap = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', markdown: 'md', rust: 'rs', go: 'go', sql: 'sql' };
       const ext = extMap[state.language] || 'txt';
-      const filename = `codeshare-${state.roomId || 'code'}.${ext}`;
+      const filename = `${state.roomId || 'code'}.${ext}`;
       const blob = new Blob([getEditorCode()], { type: 'text/plain;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);

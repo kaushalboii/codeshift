@@ -15,7 +15,7 @@
   <!-- Monaco Editor Loader (VS Code Engine) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 
-  <!-- Firebase Realtime Database (Client SDK for serverless multi-device cloud sync) -->
+  <!-- Firebase Realtime Database (Client SDK for silent background cloud sync) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -41,15 +41,15 @@
       
       <div class="header-left">
         <!-- Logo -->
-        <a href="#/" class="brand-logo" id="brand-logo" title="CodeShare Home">
+        <a href="#/new" class="brand-logo" id="brand-logo" title="New CodeShare Room">
           <span class="brand-logo-icon">&gt;&lt;</span>
           <span>CodeShare</span>
         </a>
 
-        <!-- Room Link Badge -->
-        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy room link">
+        <!-- Room Link Badge (Click to copy or change) -->
+        <div class="room-path-pill" id="btn-copy-room-link" title="Click to copy or switch room">
           <span>🔗</span>
-          <span id="room-nav-id">/demo</span>
+          <span id="room-nav-id">/kaushal</span>
         </div>
 
         <!-- Auto-Save Status Pill -->
@@ -81,7 +81,6 @@
         <div class="online-users-badge" id="btn-change-nickname" title="Click to change your display name" style="cursor: pointer;">
           <span id="user-role-badge">👤</span>
           <span id="online-users-count">1 online</span>
-          <span id="user-nickname-display" style="opacity: 0.7; margin-left: 3px;">(You)</span>
         </div>
 
       </div>
@@ -90,9 +89,9 @@
       <div class="header-right">
         
         <!-- Copy Share Link Button (Primary) -->
-        <button id="btn-share-room" class="btn-coral-share" title="Share this room with anyone across devices">
-          <span>🔗</span>
-          <span>Share Link</span>
+        <button id="btn-share-room" class="btn-coral-share" title="Copy room link to clipboard">
+          <span>📋</span>
+          <span>Copy Link</span>
         </button>
 
         <!-- New Clean Room -->
@@ -101,25 +100,15 @@
           <span>New</span>
         </button>
 
-        <!-- Cloud Sync / Firebase Settings -->
-        <button id="btn-open-cloud-sync" class="btn-subtle-action" title="Configure Firebase Realtime Database or Cloud Sync">
-          <span>☁️</span>
-          <span id="cloud-sync-badge">Cloud Sync</span>
+        <!-- Download Code -->
+        <button id="btn-download-code" class="btn-subtle-action" title="Download Code File">
+          <span>⬇️</span>
+          <span>Export</span>
         </button>
 
         <!-- Preferences / Settings -->
         <button id="btn-open-settings" class="btn-icon-rail" title="Editor Preferences">
           <span>⚙️</span>
-        </button>
-
-        <!-- Download Code -->
-        <button id="btn-download-code" class="btn-icon-rail" title="Download Code File">
-          <span>⬇️</span>
-        </button>
-
-        <!-- Fullscreen Toggle -->
-        <button id="btn-toggle-fullscreen" class="btn-icon-rail" title="Toggle Fullscreen">
-          <span>⛶</span>
         </button>
 
       </div>
@@ -144,7 +133,7 @@
         <span>•</span>
         <span id="code-stats">0 lines</span>
         <span>•</span>
-        <span id="sync-status">Local &amp; Peer Sync Active</span>
+        <span id="sync-status">Real-Time Cloud Sync Active</span>
       </div>
       <div class="status-right">
         <span id="editor-engine-label">Monaco Editor (VS Code)</span>
@@ -180,43 +169,7 @@
     </div>
   </div>
 
-  <!-- 2. Cloud Sync & Firebase Database Modal -->
-  <div id="modal-cloud-sync" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">☁️ Cloud Database &amp; Multi-Device Sync</h3>
-        <button id="btn-close-cloud-sync" class="modal-close-btn">✕</button>
-      </div>
-      <div class="modal-content">
-        <p class="modal-description">
-          To connect two different computers across the internet with 100% cloud persistence without a server, connect to <strong>Firebase Realtime Database</strong> (free spark plan):
-        </p>
-
-        <div class="form-group">
-          <label class="form-label" for="input-firebase-url">Firebase Database URL</label>
-          <input type="text" id="input-firebase-url" class="form-input" value="https://codeshift-realtimedb-default-rtdb.firebaseio.com">
-          <p style="font-size: 11px; color: var(--cs-emerald); margin-top: 4px;">
-            ● Connected to your Firebase Realtime Database. All rooms auto-save here in real-time.
-          </p>
-        </div>
-
-        <div class="form-group" style="margin-top: 16px; border-top: 1px solid var(--cs-border); padding-top: 12px;">
-          <label class="form-label" for="setting-server-url">Or Custom Node.js / WebSocket Relay</label>
-          <input type="text" id="setting-server-url" class="form-input" placeholder="wss://your-render-app.onrender.com or ws://localhost:3000">
-        </div>
-
-        <div id="sync-diagnostics" style="padding: 10px; background: rgba(0,0,0,0.3); border-radius: 4px; font-family: var(--cs-font-mono); font-size: 11px; color: var(--cs-emerald); margin-top: 12px;">
-          ● WebRTC Peer Sync: ACTIVE (Broadcasting across devices)
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-test-server-ping" class="btn-secondary">Test Connection</button>
-        <button id="btn-save-cloud-sync" class="btn-primary">Save &amp; Connect</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. Preferences Modal -->
+  <!-- 2. Preferences Modal -->
   <div id="modal-settings" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -258,7 +211,7 @@
     </div>
   </div>
 
-  <!-- 4. Nickname Modal -->
+  <!-- 3. Nickname Modal -->
   <div id="modal-nickname" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -333,6 +286,15 @@
   <div id="connection-notice-text" class="hidden"></div>
   <button id="btn-banner-config-server" class="hidden"></button>
   <button id="btn-banner-dismiss" class="hidden"></button>
+  <button id="btn-open-cloud-sync" class="hidden"></button>
+  <div id="modal-cloud-sync" class="hidden"></div>
+  <input type="hidden" id="input-firebase-url" value="https://codeshift-realtimedb-default-rtdb.firebaseio.com">
+  <input type="hidden" id="setting-server-url" value="">
+  <button id="btn-save-cloud-sync" class="hidden"></button>
+  <button id="btn-test-server-ping" class="hidden"></button>
+  <button id="btn-close-cloud-sync" class="hidden"></button>
+  <div id="sync-diagnostics" class="hidden"></div>
+  <span id="cloud-sync-badge" class="hidden"></span>
 
   <script src="app.js"></script>
 </body>

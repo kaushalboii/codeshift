@@ -25,7 +25,7 @@ jobs:
       - name: Prepare Clean Distribution
         run: |
           mkdir -p dist
-          cp -r index.html app.js styles.css public brand .nojekyll README.md dist/
+          cp -r index.html 404.html app.js styles.css public brand .nojekyll README.md dist/
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
@@ -55,7 +55,7 @@ jobs:
       - name: Prepare Clean Distribution
         run: |
           mkdir -p dist
-          cp -r index.html app.js styles.css public brand .nojekyll README.md dist/
+          cp -r index.html 404.html app.js styles.css public brand .nojekyll README.md dist/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
