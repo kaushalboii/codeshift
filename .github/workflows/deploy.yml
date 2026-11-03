@@ -32,7 +32,6 @@ jobs:
           cp .nojekyll dist/
           cp README.md dist/
           cp -r public dist/
-          cp -r brand dist/
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
