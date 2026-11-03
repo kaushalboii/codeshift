@@ -348,6 +348,71 @@
       color: #a8ecf5;
     }
 
+    /* ============================================================
+       RESPONSIVE — MOBILE PHONES & TABLETS
+    ============================================================ */
+    @media (max-width: 768px) {
+      .landing-nav {
+        padding: 12px 18px;
+      }
+      .landing-hero {
+        padding: 24px 16px 40px 16px;
+        min-height: calc(100dvh - 100px);
+      }
+      .landing-headline {
+        font-size: clamp(26px, 7.5vw, 42px);
+        letter-spacing: -0.8px;
+        margin-bottom: 12px;
+      }
+      .landing-sub {
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+      .code-card {
+        padding: 14px 16px;
+        margin-bottom: 24px;
+      }
+      .code-line {
+        font-size: 11px;
+        line-height: 1.7;
+        overflow-x: auto;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .landing-nav {
+        padding: 10px 14px;
+      }
+      .landing-brand-text {
+        font-size: 17px;
+      }
+      .room-form {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .room-prefix {
+        display: none;
+      }
+      .room-input {
+        width: 100%;
+        font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+        padding: 12px 14px;
+        text-align: center;
+      }
+      .room-go-btn {
+        width: 100%;
+        padding: 12px 0;
+        font-size: 14px;
+      }
+      .landing-tagline {
+        font-size: 10px;
+        padding: 4px 12px;
+        margin-bottom: 18px;
+      }
+    }
+
     /* Landing footer */
     .landing-footer {
       position: relative;
@@ -370,6 +435,7 @@
       flex-direction: column;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       position: relative;
       z-index: 10;
     }
