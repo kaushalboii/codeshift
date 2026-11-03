@@ -366,7 +366,24 @@ ORDER BY active_collaborators DESC;`
     connectionNoticeBanner: document.getElementById('connection-notice-banner'),
     connectionNoticeText: document.getElementById('connection-notice-text'),
     btnBannerConfigServer: document.getElementById('btn-banner-config-server'),
-    btnBannerDismiss: document.getElementById('btn-banner-dismiss')
+    btnBannerDismiss: document.getElementById('btn-banner-dismiss'),
+    // Codeshare Drawers
+    drawerSettings: document.getElementById('drawer-settings'),
+    btnCloseDrawerSettings: document.getElementById('btn-close-drawer-settings'),
+    drawerChat: document.getElementById('drawer-chat'),
+    btnToggleChat: document.getElementById('btn-toggle-chat'),
+    btnCloseDrawerChat: document.getElementById('btn-close-drawer-chat'),
+    drawerConsole: document.getElementById('drawer-console'),
+    btnToggleConsole: document.getElementById('btn-toggle-console'),
+    btnCloseDrawerConsole: document.getElementById('btn-close-drawer-console'),
+    tabBtnConsole: document.getElementById('tab-btn-console'),
+    tabBtnPreview: document.getElementById('tab-btn-preview'),
+    // Codeshare Share Modal
+    modalShare: document.getElementById('modal-share'),
+    inputShareLink: document.getElementById('input-share-link'),
+    btnModalCopyLink: document.getElementById('btn-modal-copy-link'),
+    btnModalDoneShare: document.getElementById('btn-modal-done-share'),
+    btnCloseShare: document.getElementById('btn-close-share')
   };
 
   // --- Router ---
@@ -386,7 +403,7 @@ ORDER BY active_collaborators DESC;`
       }
     } catch (e) {}
 
-    const rawHash = window.location.hash.slice(1);
+    const rawHash = (window.location.hash || '').slice(1);
     const [pathPart, queryPart] = rawHash.split('?');
     if (queryPart) {
       try {
@@ -399,10 +416,19 @@ ORDER BY active_collaborators DESC;`
       } catch (e) {}
     }
 
-    if (pathPart && pathPart.startsWith('/room/')) {
-      const parts = pathPart.split('/');
-      const roomId = parts[2] ? decodeURIComponent(parts[2].trim()) : 'general';
+    const cleanPath = (pathPart || '').replace(/^\/+/, '').trim();
+
+    if (cleanPath === 'new') {
+      navigateToRoom(generateRoomSlug());
+      return;
+    }
+
+    const reservedRoutes = ['pricing', 'signup', 'login', 'privacy', 'terms', ''];
+    if (cleanPath.startsWith('room/')) {
+      const roomId = decodeURIComponent(cleanPath.slice(5).trim()) || 'general';
       enterRoom(roomId);
+    } else if (cleanPath && !reservedRoutes.includes(cleanPath)) {
+      enterRoom(cleanPath);
     } else {
       enterLanding();
     }
@@ -417,10 +443,7 @@ ORDER BY active_collaborators DESC;`
     }
     el.viewLanding.classList.remove('hidden');
     el.viewRoom.classList.add('hidden');
-    el.roomNavControls.classList.add('hidden');
-    el.roomNavControls.classList.remove('flex');
-    el.appFooter.classList.remove('hidden');
-    document.title = "CodeShift — Think together. Code without limits.";
+    document.title = "Codeshare — Share Code in Real-time with Developers";
     setConnectionStatus('live', 'Online');
   }
 
@@ -428,13 +451,10 @@ ORDER BY active_collaborators DESC;`
     state.roomId = roomId;
     el.viewLanding.classList.add('hidden');
     el.viewRoom.classList.remove('hidden');
-    el.roomNavControls.classList.remove('hidden');
-    el.roomNavControls.classList.add('flex');
-    el.appFooter.classList.add('hidden');
 
-    el.roomNavId.textContent = roomId;
+    el.roomNavId.textContent = '/' + roomId;
     el.userNicknameDisplay.textContent = state.userName;
-    document.title = `CodeShift • #${roomId}`;
+    document.title = `Codeshare • /${roomId}`;
 
     // Initialize Monaco if ready, otherwise fallback
     initMonacoEditor(DEFAULT_TEMPLATES[state.language] || DEFAULT_TEMPLATES.javascript);
@@ -443,11 +463,11 @@ ORDER BY active_collaborators DESC;`
     connectWebSocket(roomId);
 
     updateExecutionBadge();
-    showToast(`Entering room #${roomId}...`, 'info');
+    showToast(`Entering room /${roomId}...`, 'info');
   }
 
   function navigateToRoom(roomId) {
-    window.location.hash = `/room/${encodeURIComponent(roomId)}`;
+    window.location.hash = `/${encodeURIComponent(roomId)}`;
   }
 
   function generateRoomSlug() {
@@ -1379,7 +1399,7 @@ ORDER BY active_collaborators DESC;`
   el.navBtnInstantRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
   el.btnHeroLaunchRoom.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
 
-  // Copy share link
+  // Share Modal & Copy Link
   function copyShareLink() {
     let url = window.location.href;
     const customServer = (state.serverUrl || localStorage.getItem('codeshift_ws_server') || '').trim();
@@ -1387,17 +1407,52 @@ ORDER BY active_collaborators DESC;`
       const sep = url.includes('?') ? '&' : '?';
       url = `${url}${sep}server=${encodeURIComponent(customServer)}`;
     }
+    if (el.inputShareLink) el.inputShareLink.value = url;
+    if (el.modalShare) {
+      el.modalShare.classList.remove('hidden');
+      el.modalShare.classList.add('flex');
+      if (el.inputShareLink) el.inputShareLink.select();
+    }
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
-        showToast('Room link copied! Collaborators will connect directly 📋', 'success');
-      });
-    } else {
-      prompt('Copy this room URL:', url);
+        showToast('Room link copied to clipboard! 📋', 'success');
+      }).catch(() => {});
     }
   }
 
   el.btnCopyRoomLink.addEventListener('click', copyShareLink);
   el.btnShareRoom.addEventListener('click', copyShareLink);
+
+  if (el.btnModalCopyLink) {
+    el.btnModalCopyLink.addEventListener('click', () => {
+      if (el.inputShareLink) {
+        el.inputShareLink.select();
+        navigator.clipboard.writeText(el.inputShareLink.value).then(() => {
+          showToast('Link copied! 📋', 'success');
+          el.btnModalCopyLink.textContent = 'Copied!';
+          setTimeout(() => { if (el.btnModalCopyLink) el.btnModalCopyLink.textContent = 'Copy Link'; }, 2000);
+        });
+      }
+    });
+  }
+
+  if (el.btnModalDoneShare) {
+    el.btnModalDoneShare.addEventListener('click', () => {
+      if (el.modalShare) {
+        el.modalShare.classList.add('hidden');
+        el.modalShare.classList.remove('flex');
+      }
+    });
+  }
+
+  if (el.btnCloseShare) {
+    el.btnCloseShare.addEventListener('click', () => {
+      if (el.modalShare) {
+        el.modalShare.classList.add('hidden');
+        el.modalShare.classList.remove('flex');
+      }
+    });
+  }
 
   // Run & Format Buttons
   el.btnRunCode.addEventListener('click', runCurrentCode);
@@ -1517,7 +1572,23 @@ ORDER BY active_collaborators DESC;`
     }
   });
 
-  // Settings Modal
+  // Codeshare Drawer Management
+  function closeAllDrawers() {
+    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
+    if (el.drawerChat) el.drawerChat.classList.add('closed');
+    if (el.drawerConsole) el.drawerConsole.classList.add('closed');
+  }
+
+  function toggleDrawer(drawerEl) {
+    if (!drawerEl) return;
+    const isClosed = drawerEl.classList.contains('closed');
+    closeAllDrawers();
+    if (isClosed) {
+      drawerEl.classList.remove('closed');
+    }
+  }
+
+  // Settings Drawer
   el.btnOpenSettings.addEventListener('click', () => {
     el.settingFontsize.value = state.settings.fontSize;
     el.settingTabsize.value = state.settings.tabSize;
@@ -1526,12 +1597,15 @@ ORDER BY active_collaborators DESC;`
     if (el.settingServerUrl) {
       el.settingServerUrl.value = state.serverUrl || localStorage.getItem('codeshift_ws_server') || '';
     }
-    el.modalSettings.classList.remove('hidden');
-    el.modalSettings.classList.add('flex');
+    toggleDrawer(el.drawerSettings);
   });
+  if (el.btnCloseDrawerSettings) {
+    el.btnCloseDrawerSettings.addEventListener('click', () => {
+      if (el.drawerSettings) el.drawerSettings.classList.add('closed');
+    });
+  }
   el.btnCloseSettings.addEventListener('click', () => {
-    el.modalSettings.classList.add('hidden');
-    el.modalSettings.classList.remove('flex');
+    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
   });
   el.btnSaveSettings.addEventListener('click', () => {
     state.settings.fontSize = parseInt(el.settingFontsize.value, 10);
@@ -1568,9 +1642,72 @@ ORDER BY active_collaborators DESC;`
       connectWebSocket(state.roomId);
     }
 
-    el.modalSettings.classList.add('hidden');
-    el.modalSettings.classList.remove('flex');
+    if (el.drawerSettings) el.drawerSettings.classList.add('closed');
     showToast('Preferences updated!', 'success');
+  });
+
+  // Chat & Console Drawer Toggles
+  if (el.btnToggleChat) {
+    el.btnToggleChat.addEventListener('click', () => {
+      toggleDrawer(el.drawerChat);
+      if (el.badgeChatUnread) el.badgeChatUnread.classList.add('hidden');
+    });
+  }
+  if (el.btnCloseDrawerChat) {
+    el.btnCloseDrawerChat.addEventListener('click', () => {
+      if (el.drawerChat) el.drawerChat.classList.add('closed');
+    });
+  }
+
+  if (el.btnToggleConsole) {
+    el.btnToggleConsole.addEventListener('click', () => {
+      toggleDrawer(el.drawerConsole);
+    });
+  }
+  if (el.btnCloseDrawerConsole) {
+    el.btnCloseDrawerConsole.addEventListener('click', () => {
+      if (el.drawerConsole) el.drawerConsole.classList.add('closed');
+    });
+  }
+
+  // Console vs Web Preview Tab Toggles inside drawer
+  if (el.tabBtnConsole && el.tabBtnPreview) {
+    el.tabBtnConsole.addEventListener('click', () => {
+      el.tabBtnConsole.style.color = '#ffffff';
+      el.tabBtnConsole.style.borderBottom = '2px solid var(--cs-coral)';
+      el.tabBtnPreview.style.color = '#9aa2b1';
+      el.tabBtnPreview.style.borderBottom = 'none';
+      if (el.consoleOutput) el.consoleOutput.classList.remove('hidden');
+      if (el.previewIframe) el.previewIframe.classList.add('hidden');
+      if (el.btnClearConsole) el.btnClearConsole.style.display = 'inline-block';
+      if (el.btnRefreshPreview) el.btnRefreshPreview.style.display = 'none';
+    });
+    el.tabBtnPreview.addEventListener('click', () => {
+      el.tabBtnPreview.style.color = '#ffffff';
+      el.tabBtnPreview.style.borderBottom = '2px solid var(--cs-coral)';
+      el.tabBtnConsole.style.color = '#9aa2b1';
+      el.tabBtnConsole.style.borderBottom = 'none';
+      if (el.previewIframe) el.previewIframe.classList.remove('hidden');
+      if (el.consoleOutput) el.consoleOutput.classList.add('hidden');
+      if (el.btnClearConsole) el.btnClearConsole.style.display = 'none';
+      if (el.btnRefreshPreview) el.btnRefreshPreview.style.display = 'inline-block';
+      renderWebPreview();
+    });
+  }
+
+  // Cancel secondary buttons in modals
+  const cancelNick2 = document.getElementById('btn-cancel-nickname-2');
+  if (cancelNick2) cancelNick2.addEventListener('click', () => el.btnCancelNickname.click());
+
+  const cancelSetPass2 = document.getElementById('btn-cancel-set-password-2');
+  if (cancelSetPass2) cancelSetPass2.addEventListener('click', () => el.btnCancelSetPassword.click());
+
+  const cancelPass2 = document.getElementById('btn-cancel-password-2');
+  if (cancelPass2) cancelPass2.addEventListener('click', () => el.btnCancelPassword.click());
+
+  // Landing page launch buttons
+  document.querySelectorAll('.btn-launch-trigger').forEach(btn => {
+    btn.addEventListener('click', () => navigateToRoom(generateRoomSlug()));
   });
 
   // Test Server Ping Button

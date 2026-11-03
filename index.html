@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeShift — Think together. Code without limits.</title>
-  <meta name="description" content="Production-grade real-time collaborative code editor. Internet-wide synchronization, Monaco Editor, live execution, and zero setup.">
+  <title>Codeshare — Share Code in Real-time with Developers</title>
+  <meta name="description" content="An online code editor for interviews, troubleshooting, teaching & more. Share code in real-time with developers.">
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg">
-  
-  <!-- Fonts -->
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -17,258 +17,300 @@
 
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-base text-main font-sans antialiased overflow-x-hidden selection:bg-violet-500/30 selection:text-white">
-
-  <!-- Ambient Glows -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="ambient-glow glow-1"></div>
-    <div class="ambient-glow glow-2"></div>
-    <div class="grid-overlay"></div>
-  </div>
+<body>
 
   <!-- Toast Container -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container"></div>
 
-  <!-- App Root -->
-  <div id="app" class="relative z-10 min-h-screen flex flex-col">
+  <!-- App Container -->
+  <div id="app">
 
-    <!-- Top Navigation -->
-    <header class="border-b border-border-dim bg-surface/75 backdrop-blur-md sticky top-0 z-30 transition-all duration-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        
-        <!-- Brand Logo -->
-        <a href="#/" id="brand-logo" class="flex items-center gap-3 group focus:outline-none">
-          <div class="w-10 h-10 rounded-xl bg-surface-elevated border border-border-highlight flex items-center justify-center p-1.5 shadow-lg shadow-violet-950/40 group-hover:border-violet-500/60 group-hover:scale-105 transition-all">
-            <svg viewBox="0 0 64 64" class="w-full h-full" fill="none">
-              <path d="M22 20L12 32L22 44" stroke="url(#navGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M42 20L52 32L42 44" stroke="url(#navGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M32 17L25 26H29V41C29 42 29.8 43 31 43H33C34.2 43 35 42 35 41V26H39L32 17Z" fill="url(#navShift)"/>
-              <defs>
-                <linearGradient id="navGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#6366F1"/>
-                  <stop offset="100%" stop-color="#38BDF8"/>
-                </linearGradient>
-                <linearGradient id="navShift" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#C084FC"/>
-                  <stop offset="100%" stop-color="#8B7CFF"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span class="text-xl font-extrabold tracking-tight text-white">Code<span class="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-400">Shift</span></span>
-            <span id="global-connection-pill" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span id="global-connection-label">Live</span>
-            </span>
-          </div>
+    <!-- ==================================================================== -->
+    <!-- VIEW 1: CODESHARE LANDING PAGE                                       -->
+    <!-- ==================================================================== -->
+    <div id="view-landing">
+      
+      <!-- Top Navigation -->
+      <nav class="landing-nav">
+        <a href="#/" class="brand-logo-wrap" id="brand-logo">
+          <span class="brand-icon">&gt;&lt;</span>
+          <span>codeshare</span>
         </a>
-
-        <!-- Room Header Controls (Active inside a room) -->
-        <div id="room-nav-controls" class="hidden items-center gap-2 sm:gap-3">
-          
-          <!-- Room ID pill with copy action -->
-          <button id="btn-copy-room-link" title="Copy room link" class="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-elevated hover:bg-surface-elevated/80 border border-border-dim hover:border-violet-500/50 text-xs font-mono text-zinc-300 hover:text-white transition-all shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span id="room-nav-id" class="font-semibold">room-123</span>
-            <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-            </svg>
-          </button>
-
-          <!-- Active Peers Stack -->
-          <div id="peer-avatars" class="flex items-center -space-x-2 overflow-hidden pl-1"></div>
-
-          <!-- Role Badge (Host vs Guest) -->
-          <span id="user-role-badge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-violet-500/10 text-violet-300 border border-violet-500/20">
-            👑 Host
-          </span>
-
-          <!-- Nickname Badge -->
-          <button id="btn-change-nickname" title="Change your username" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border-dim text-xs font-medium text-zinc-300 hover:text-white hover:border-border-highlight transition-all">
-            <span class="text-violet-400">👤</span>
-            <span id="user-nickname-display">You</span>
-          </button>
+        <div class="landing-nav-links">
+          <a href="#/pricing" id="nav-link-pricing">Pricing</a>
+          <a href="#/signup" id="nav-link-signup">Sign Up</a>
+          <button id="nav-btn-instant-room" class="landing-login-btn">Log In</button>
         </div>
+      </nav>
 
-        <!-- Global Right Actions -->
-        <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Hero Section -->
+      <section class="landing-hero">
+        <h1 class="landing-hero-title">Share Code in Real-time with Developers</h1>
+        <p class="landing-hero-sub">An online code editor for interviews, troubleshooting, teaching &amp; more…</p>
+        
+        <button id="btn-hero-launch-room" class="btn-coral-cta">
+          <span>Share Code Now</span>
+        </button>
+        <span class="landing-hero-note">Share code for free.</span>
+
+        <!-- Hidden input for custom room creation if requested -->
+        <input type="hidden" id="input-custom-room" value="">
+        <button id="btn-create-or-join" class="hidden"></button>
+        <button id="btn-quick-sample-room" class="hidden"></button>
+
+        <!-- Double Mockups: Editor + Video Collaboration -->
+        <div class="hero-mockups-wrap">
           
-          <!-- Instant Room Button -->
-          <button id="nav-btn-instant-room" class="btn-primary text-xs sm:text-sm px-3.5 py-1.5 rounded-lg font-semibold flex items-center gap-2 shadow-lg shadow-violet-600/20 hover:shadow-violet-600/40 transition-all">
-            <span>New Room</span>
-            <span class="text-violet-200">↗</span>
-          </button>
-
-          <!-- Theme Selector -->
-          <select id="select-theme" class="bg-surface-elevated text-xs text-zinc-300 border border-border-dim rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-violet-500 cursor-pointer">
-            <option value="codeshift">CodeShift Violet</option>
-            <option value="obsidian">Obsidian Dark</option>
-            <option value="cyberpunk">Cyber Neon</option>
-            <option value="tokyo">Tokyo Twilight</option>
-            <option value="light">Paper Light</option>
-          </select>
-
-          <!-- Settings Trigger -->
-          <button id="btn-open-settings" title="Editor Preferences" class="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-surface-elevated transition-all">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- MAIN VIEW CONTAINER -->
-    <main class="flex-1 flex flex-col">
-
-      <!-- ============================================== -->
-      <!-- VIEW 1: LANDING & ROOM LAUNCHER               -->
-      <!-- ============================================== -->
-      <section id="view-landing" class="flex-1 flex flex-col justify-center">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16 w-full">
-          
-          <!-- Hero Section -->
-          <div class="text-center max-w-3xl mx-auto space-y-6">
-            
-            <!-- Launch Badge -->
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-300 border border-violet-500/20 shadow-sm animate-fade-in">
-              <span class="w-2 h-2 rounded-full bg-violet-400"></span>
-              <span>Internet-Wide Real-Time Collaboration</span>
-              <span class="text-zinc-500">•</span>
-              <span class="text-cyan-400">Monaco Editor Inside</span>
+          <!-- Mockup 1: Real-time Editor Window -->
+          <div class="editor-window-mockup">
+            <div class="window-titlebar">
+              <span class="window-dot dot-red"></span>
+              <span class="window-dot dot-yellow"></span>
+              <span class="window-dot dot-green"></span>
             </div>
-
-            <!-- Big Tagline -->
-            <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
-              Think together.<br/>
-              <span class="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-400 glow-text">Code without limits.</span>
-            </h1>
-
-            <p class="text-base sm:text-xl text-zinc-400 font-normal leading-relaxed max-w-2xl mx-auto">
-              Production-ready collaborative coding in your browser. Powered by WebSocket room synchronization, remote user cursors, VS Code Monaco editor, and live execution.
-            </p>
-
-            <!-- Room Action Card -->
-            <div class="pt-4 max-w-md mx-auto">
-              <div class="p-2 sm:p-2.5 rounded-2xl bg-surface/90 border border-border-dim shadow-2xl backdrop-blur-xl flex flex-col sm:flex-row gap-2">
-                <input 
-                  type="text" 
-                  id="input-custom-room" 
-                  placeholder="Enter or create room name..." 
-                  class="flex-1 bg-surface-elevated/70 border border-border-dim rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 font-mono focus:outline-none focus:border-violet-500 transition-all"
-                  autocomplete="off"
-                />
-                <button 
-                  id="btn-create-or-join" 
-                  class="btn-primary px-6 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
-                >
-                  <span>Launch Room</span>
-                  <span>⚡</span>
-                </button>
-              </div>
-
-              <div class="flex items-center justify-between px-3 pt-3 text-xs text-zinc-500 font-mono">
-                <span>Try instant: <button id="btn-quick-sample-room" class="text-violet-400 hover:underline">#shift-demo</button></span>
-                <span>WebSocket + Cloud sync</span>
-              </div>
+            <div class="mockup-body">
+              <div class="mockup-line"><span class="line-no">1</span><span>// https://codeshare.io/session/fibonacci</span></div>
+              <div class="mockup-line"><span class="line-no">2</span><span>// 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144...</span></div>
+              <div class="mockup-line"><span class="line-no">3</span><span></span></div>
+              <div class="mockup-line"><span class="line-no">4</span><span><span class="mockup-code-highlight">function</span> fibonacci(n) {</span></div>
+              <div class="mockup-line"><span class="line-no">5</span><span>&nbsp;&nbsp;if (n &lt;= 1) return n;</span></div>
+              <div class="mockup-line"><span class="line-no">6</span><span>&nbsp;&nbsp;<span class="mockup-code-highlight">return</span> fibonacci(n - 1) + fibonacci(n - 2);</span></div>
+              <div class="mockup-line"><span class="line-no">7</span><span>}</span></div>
+              <div class="mockup-line"><span class="line-no">8</span><span></span></div>
+              <div class="mockup-line"><span class="line-no">9</span><span>console.log(fibonacci(10)); <span class="mockup-cursor"></span></span></div>
             </div>
           </div>
 
-          <!-- Feature Highlights Grid -->
-          <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-violet-500/30 transition-all group">
-              <div class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
-                🌐
-              </div>
-              <h3 class="text-lg font-bold text-white mb-2">Internet-Wide WebSockets</h3>
-              <p class="text-sm text-zinc-400 leading-relaxed">
-                Connect two developers in different countries. True bi-directional sync over WebSockets with automatic reconnection.
-              </p>
+          <!-- Mockup 2: Peer Collaboration Tile -->
+          <div class="video-window-mockup">
+            <div class="window-titlebar">
+              <span class="window-dot dot-red"></span>
+              <span class="window-dot dot-yellow"></span>
+              <span class="window-dot dot-green"></span>
             </div>
-
-            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-cyan-500/30 transition-all group">
-              <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
-                ⌨️
-              </div>
-              <h3 class="text-lg font-bold text-white mb-2">Monaco Editor (VS Code)</h3>
-              <p class="text-sm text-zinc-400 leading-relaxed">
-                Full-featured VS Code engine: line numbers, code folding, bracket colorization, find & replace, and multi-language syntax.
-              </p>
+            <div class="video-tile">
+              <div class="avatar-pair-badge">👨‍💻</div>
+              <div class="video-label">Kaushal &amp; Collaborator</div>
+              <div class="video-status">● Live WebSocket Peer Sync</div>
             </div>
-
-            <div class="p-6 rounded-2xl bg-surface/60 border border-border-dim hover:border-purple-500/30 transition-all group">
-              <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center text-lg mb-4 group-hover:scale-110 transition-transform">
-                🛡️
-              </div>
-              <h3 class="text-lg font-bold text-white mb-2">Host Permissions & Lock</h3>
-              <p class="text-sm text-zinc-400 leading-relaxed">
-                Host privileges, view-only mode for guests, optional password protection, and time-stamped diff version checkpoints.
-              </p>
-            </div>
-
-          </div>
-
-          <!-- Bottom CTA -->
-          <div class="mt-16 p-8 rounded-3xl bg-gradient-to-r from-violet-950/30 via-surface-elevated/40 to-cyan-950/20 border border-violet-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-              <div class="flex items-center gap-2 text-violet-400 text-xs font-mono uppercase tracking-widest font-bold mb-1">
-                <span>Production Architecture</span>
-              </div>
-              <h4 class="text-2xl font-bold text-white">Cloudflare Workers + Durable Objects Ready</h4>
-              <p class="text-sm text-zinc-400 mt-1 max-w-xl">
-                Deployable on Cloudflare Pages, edge WebSockets, and standard Node.js servers with zero external dependencies.
-              </p>
-            </div>
-            <button id="btn-hero-launch-room" class="btn-primary px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap shadow-lg shadow-violet-600/30">
-              Start Coding Now ↗
-            </button>
           </div>
 
         </div>
       </section>
 
-      <!-- ============================================== -->
-      <!-- VIEW 2: COLLABORATIVE STUDIO (ROOM)            -->
-      <!-- ============================================== -->
-      <section id="view-room" class="hidden flex-1 flex flex-col overflow-hidden">
-        
-        <!-- Connection Notice Banner (Shown on static hosts or offline mode) -->
-        <div id="connection-notice-banner" class="hidden bg-violet-950/40 border-b border-violet-500/20 px-4 py-2 text-xs text-violet-200 items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span>📡</span>
-            <span id="connection-notice-text">Static GitHub Pages Mode: Syncing across local tabs. To pair across different computers, connect a WebSocket backend.</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="btn-banner-config-server" class="px-2.5 py-0.5 rounded bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/30 font-medium text-[11px] transition-colors">Configure Server</button>
-            <button id="btn-banner-dismiss" class="text-zinc-400 hover:text-white text-xs px-1">✕</button>
-          </div>
-        </div>
-
-        <!-- View-Only Lock Banner (Shown when host locks room) -->
-        <div id="readonly-banner" class="hidden bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 items-center justify-between">
-          <div class="flex items-center gap-2 font-medium">
-            <span>🔒</span>
-            <span>View-Only Mode: The room host has locked editing. You can inspect code and run tests, but edits are disabled.</span>
-          </div>
-          <span class="text-[10px] text-amber-400/80 font-mono">READ-ONLY</span>
-        </div>
-
-        <!-- Studio Toolbar -->
-        <div class="bg-surface-elevated border-b border-border-dim px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <!-- Blue Feature Section (Exact Codeshare Blue) -->
+      <section class="landing-blue-section">
+        <div class="blue-section-container">
           
-          <!-- Left Controls: Language, Run, Format -->
-          <div class="flex items-center gap-2">
+          <!-- Logos Banner -->
+          <div class="logos-strip">
+            <span class="logos-heading">Used by software engineers at companies and universities we respect and admire.</span>
+            <div class="logos-row">
+              <span>Adobe</span>
+              <span>Microsoft</span>
+              <span>Stanford University</span>
+              <span>IBM</span>
+              <span>ebay</span>
+              <span>Cornell</span>
+            </div>
+          </div>
+
+          <!-- 3 Columns -->
+          <div class="feature-columns-grid">
             
-            <!-- Language Selector -->
-            <div class="flex items-center gap-1.5 bg-surface border border-border-dim rounded-lg px-2 py-1">
-              <span class="text-zinc-500 font-mono text-[11px]">Lang:</span>
-              <select id="select-language" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+            <div class="feature-col">
+              <h3>Code with your team</h3>
+              <p>Open a Codeshare editor, write or copy code, then share it with friends and colleagues. Pair program and troubleshoot together.</p>
+              <button class="btn-white-outline btn-launch-trigger">Hack Together</button>
+            </div>
+
+            <div class="feature-col">
+              <h3>Interview developers</h3>
+              <p>Set coding tasks and observe in real-time when interviewing remotely or in person. Nobody likes writing code on a whiteboard.</p>
+              <button class="btn-white-outline btn-launch-trigger">Start An Interview</button>
+            </div>
+
+            <div class="feature-col">
+              <h3>Teach people to program</h3>
+              <p>Share your code with students and peers then educate them. Universities and colleges around the world use Codeshare every day.</p>
+              <button class="btn-white-outline btn-launch-trigger">Teach Code</button>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Landing Dark Footer -->
+      <footer id="app-footer" class="landing-footer">
+        <div class="footer-credit">Created by <a href="https://github.com/kaushalboii" target="_blank">Kaushal</a>. For help and support shoot us an <a href="mailto:kaushal@codeshift.dev">email</a>.</div>
+        <div><a href="#/privacy">Privacy Policy</a> • <a href="#/terms">Terms of Service</a></div>
+      </footer>
+
+    </div>
+
+
+    <!-- ==================================================================== -->
+    <!-- VIEW 2: CODESHARE COLLABORATIVE EDITOR (ROOM)                        -->
+    <!-- ==================================================================== -->
+    <div id="view-room" class="hidden">
+      
+      <!-- Top Room Navigation Bar (Codeshare Style) -->
+      <header class="room-header">
+        
+        <div class="room-header-left">
+          <a href="#/" class="brand-logo-wrap" title="Back to home">
+            <span class="brand-icon">&gt;&lt;</span>
+            <span>codeshare</span>
+          </a>
+          <span id="room-nav-id" class="room-slug-badge">kaushal</span>
+          
+          <!-- Room Nav Controls Compatibility Container -->
+          <div id="room-nav-controls" class="flex" style="align-items: center; gap: 8px;">
+            <span id="global-connection-pill" class="user-badge-chip" title="Click to view connection status" style="cursor: pointer;">
+              <span id="sync-indicator-dot" class="user-status-dot"></span>
+              <span id="global-connection-label">Live</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="room-header-right">
+          <span class="expiry-tag">Expires in 24 hours</span>
+          
+          <!-- Action Buttons -->
+          <button id="btn-take-snapshot" class="btn-header-save" title="Save snapshot checkpoint (⌘+S)">
+            <span>🔖</span>
+            <span>Save</span>
+          </button>
+          
+          <button id="btn-share-room" class="btn-header-share" title="Share this room link">
+            <span>👥</span>
+            <span>Share</span>
+          </button>
+
+          <button id="btn-run-code" class="btn-header-run" title="Execute current code (⌘+Enter)">
+            <span>▶</span>
+            <span>Run</span>
+          </button>
+
+          <!-- User Chip -->
+          <button id="btn-change-nickname" class="user-badge-chip" title="Click to change your display name">
+            <span id="user-role-badge">👤</span>
+            <span id="user-nickname-display">You</span>
+          </button>
+
+          <!-- Hidden compatibility elements -->
+          <button id="btn-copy-room-link" class="hidden"></button>
+          <button id="btn-format-code" class="hidden"></button>
+          <button id="btn-create-snapshot-modal" class="hidden"></button>
+          <div id="peer-avatars" class="hidden"></div>
+        </div>
+
+      </header>
+
+      <!-- GitHub Pages Notice Banner (Shown on static hosts without server) -->
+      <div id="connection-notice-banner" class="room-alert-banner banner-info hidden">
+        <div>
+          <span>📡 </span>
+          <span id="connection-notice-text">Static GitHub Pages Mode: Syncing across local tabs. To pair across different computers, connect a WebSocket backend.</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="btn-banner-config-server" style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Configure Server</button>
+          <button id="btn-banner-dismiss" style="opacity: 0.6;">✕</button>
+        </div>
+      </div>
+
+      <!-- View-Only Lock Banner -->
+      <div id="readonly-banner" class="room-alert-banner banner-warning hidden">
+        <div>
+          <span>🔒 </span>
+          <span>View-Only Mode: Editing is locked by the host. You can inspect and run tests, but edits are disabled.</span>
+        </div>
+        <span style="font-family: var(--cs-font-mono); font-size: 10px; font-weight: 700;">READ-ONLY</span>
+      </div>
+
+      <!-- Main Room Workspace -->
+      <div class="room-workspace">
+        
+        <!-- Editor Canvas (Edge-to-Edge) -->
+        <main class="editor-main-canvas" id="editor-container">
+          <div id="monaco-editor-container"></div>
+          
+          <!-- Lightweight Fallback Editor -->
+          <div id="fallback-editor-wrapper" class="hidden">
+            <div id="editor-line-numbers">1</div>
+            <textarea id="code-editor-textarea" spellcheck="false" placeholder="// Write or paste your code here..."></textarea>
+          </div>
+        </main>
+
+        <!-- Right Vertical Action Rail (Exact Codeshare Signature Toolbar) -->
+        <aside class="room-right-rail">
+          
+          <!-- Settings Trigger -->
+          <button id="btn-open-settings" class="rail-btn" title="Editor Preferences &amp; Settings">
+            <span>⚙️</span>
+          </button>
+
+          <!-- Download Code -->
+          <button id="btn-download-code" class="rail-btn" title="Download Code File">
+            <span>⬇️</span>
+          </button>
+
+          <!-- Toggle Chat -->
+          <button id="btn-toggle-chat" class="rail-btn" title="Room Chat">
+            <span>💬</span>
+            <span id="badge-chat-unread" class="rail-badge hidden"></span>
+          </button>
+
+          <!-- Toggle Console / Preview -->
+          <button id="btn-toggle-console" class="rail-btn" title="Execution Console &amp; Web Preview">
+            <span>📺</span>
+          </button>
+
+          <!-- Lock Room View-Only (Host) -->
+          <button id="btn-toggle-readonly" class="rail-btn" title="Toggle View-Only Lock">
+            <span id="icon-readonly">🔓</span>
+            <span id="label-readonly" class="hidden">Lock</span>
+          </button>
+
+          <!-- Password Lock -->
+          <button id="btn-set-room-password" class="rail-btn" title="Room Security &amp; Password">
+            <span>🔑</span>
+          </button>
+
+          <!-- Fullscreen -->
+          <button id="btn-toggle-fullscreen" class="rail-btn" title="Toggle Fullscreen">
+            <span>⛶</span>
+          </button>
+
+          <!-- Hidden compatibility elements -->
+          <button id="btn-toggle-sidepanel" class="hidden"></button>
+          <div id="side-panel" class="hidden"></div>
+          <div class="side-tab hidden" data-tab="tab-console"></div>
+          <div class="tab-pane hidden" id="tab-console"></div>
+          <span id="badge-snapshots-count" class="hidden">0</span>
+          <span id="badge-execution-mode" class="hidden"></span>
+          <span id="editor-engine-label" class="hidden">Monaco</span>
+          <div id="snapshots-list" class="hidden"></div>
+        </aside>
+
+        <!-- ================================================================ -->
+        <!-- SLIDEOUT DRAWER 1: SETTINGS DRAWER                               -->
+        <!-- ================================================================ -->
+        <div id="drawer-settings" class="slideout-drawer closed">
+          <div class="drawer-header">
+            <span class="drawer-title">Editor Settings</span>
+            <button id="btn-close-drawer-settings" class="drawer-close-btn">✕</button>
+          </div>
+          
+          <div class="drawer-content">
+            
+            <div class="settings-group">
+              <label class="settings-label" for="select-language">Syntax Mode</label>
+              <select id="select-language" class="settings-select">
                 <option value="javascript">JavaScript</option>
                 <option value="typescript">TypeScript</option>
-                <option value="html">HTML</option>
+                <option value="html">HTML / CSS</option>
                 <option value="css">CSS</option>
                 <option value="python">Python</option>
                 <option value="json">JSON</option>
@@ -279,341 +321,241 @@
               </select>
             </div>
 
-            <!-- Execution Mode Tag -->
-            <span id="badge-execution-mode" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 text-violet-300 border border-violet-500/20">
-              ⚡ In-Browser Execution
-            </span>
-
-            <!-- Run Button -->
-            <button id="btn-run-code" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all shadow-sm">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
-              </svg>
-              <span>Run (⌘Enter)</span>
-            </button>
-
-            <!-- Format Code Button -->
-            <button id="btn-format-code" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border-dim hover:border-border-highlight text-zinc-300 hover:text-white transition-all">
-              <span>✨ Format</span>
-            </button>
-
-            <!-- Take Snapshot -->
-            <button id="btn-take-snapshot" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface border border-border-dim hover:border-violet-500/40 text-violet-300 hover:text-white transition-all">
-              <span>📸 Snapshot</span>
-            </button>
-          </div>
-
-          <!-- Center: Host Controls & Room Settings -->
-          <div class="flex items-center gap-2">
-            <!-- Host View-Only Toggle Button -->
-            <button id="btn-toggle-readonly" title="Toggle view-only mode for guests" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-dim text-[11px] text-zinc-300 hover:text-white hover:border-violet-500 transition-all">
-              <span id="icon-readonly">🔓</span>
-              <span id="label-readonly">Lock Editor</span>
-            </button>
-
-            <!-- Host Set Password Button -->
-            <button id="btn-set-room-password" title="Protect room with a password" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border-dim text-[11px] text-zinc-300 hover:text-white hover:border-violet-500 transition-all">
-              <span>🔑</span>
-              <span>Password</span>
-            </button>
-          </div>
-
-          <!-- Right Controls: Share, Download, Fullscreen, Panel toggle -->
-          <div class="flex items-center gap-2">
-            <!-- Fullscreen Editor Toggle -->
-            <button id="btn-toggle-fullscreen" title="Toggle Fullscreen Editor" class="p-1.5 rounded-lg bg-surface border border-border-dim hover:text-white text-zinc-400 transition-all">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-              </svg>
-            </button>
-
-            <!-- Download Code -->
-            <button id="btn-download-code" title="Download Code File" class="p-1.5 rounded-lg bg-surface border border-border-dim hover:text-white text-zinc-400 transition-all">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-              </svg>
-            </button>
-
-            <!-- Share Room Link -->
-            <button id="btn-share-room" class="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold">
-              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-              </svg>
-              <span>Share Link</span>
-            </button>
-
-            <!-- Side Panel Toggle -->
-            <button id="btn-toggle-sidepanel" title="Toggle Output/Chat Panel" class="p-1.5 rounded-lg bg-surface border border-border-dim hover:text-white text-zinc-400 transition-all">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Studio Workspace (Split: Editor + Side Panel) -->
-        <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-
-          <!-- Left: Code Editor Container -->
-          <div id="editor-container" class="flex-1 flex flex-col min-w-0 bg-[#0d0e15] relative overflow-hidden">
-            
-            <!-- Monaco Editor Mount Point -->
-            <div id="monaco-editor-container" class="w-full flex-1 min-h-0"></div>
-
-            <!-- Fallback Textarea Editor (If Monaco CDN is loading or unavailable) -->
-            <div id="fallback-editor-wrapper" class="hidden flex-1 flex overflow-hidden font-mono text-sm">
-              <div id="editor-line-numbers" class="w-12 py-3 select-none text-right pr-3 text-zinc-600 bg-[#090a0f] border-r border-border-dim/60 font-mono text-xs leading-6 overflow-hidden">
-                <div>1</div>
-              </div>
-              <div class="flex-1 relative overflow-auto">
-                <textarea 
-                  id="code-editor-textarea" 
-                  class="absolute inset-0 w-full h-full p-3 font-mono text-sm leading-6 bg-transparent text-zinc-100 resize-none focus:outline-none selection:bg-violet-600/30 whitespace-pre tab-4" 
-                  spellcheck="false" 
-                  autocapitalize="off" 
-                  autocomplete="off"
-                  placeholder="// Connecting to CodeShift..."
-                ></textarea>
-              </div>
+            <div class="settings-group">
+              <label class="settings-label" for="select-theme">Editor Theme</label>
+              <select id="select-theme" class="settings-select">
+                <option value="codeshift">Codeshare Dark (Default)</option>
+                <option value="obsidian">Obsidian Black</option>
+                <option value="cyberpunk">Cyber Neon</option>
+                <option value="tokyo">Tokyo Night</option>
+                <option value="light">Paper Light</option>
+              </select>
             </div>
 
-            <!-- Editor Bottom Status Bar -->
-            <div class="bg-[#090a0f] border-t border-border-dim/70 px-4 py-1.5 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-              <div class="flex items-center gap-3">
-                <span class="flex items-center gap-1.5">
-                  <span id="sync-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span id="sync-status">Connected</span>
-                </span>
-                <span class="text-zinc-600">|</span>
-                <span id="cursor-position">Ln 1, Col 1</span>
-                <span class="text-zinc-600">|</span>
-                <span id="code-stats">0 lines</span>
-              </div>
-              <div class="flex items-center gap-3">
-                <span id="editor-engine-label">Monaco Editor</span>
-                <span class="text-zinc-600">|</span>
-                <span>Tab: 2 spaces</span>
-                <span class="text-zinc-600">|</span>
-                <span>UTF-8</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Divider Handle -->
-          <div id="pane-resizer" class="hidden md:block w-1 bg-border-dim hover:bg-violet-500 cursor-col-resize transition-colors"></div>
-
-          <!-- Right: Side Panel (Console, Preview, Chat, Snapshots) -->
-          <div id="side-panel" class="w-full md:w-[440px] flex flex-col bg-surface border-t md:border-t-0 md:border-l border-border-dim transition-all">
-            
-            <!-- Side Panel Tabs -->
-            <div class="bg-surface-elevated border-b border-border-dim flex items-center text-xs font-medium">
-              <button class="side-tab active px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-violet-500 text-white" data-tab="tab-console">
-                <span>Console</span>
-              </button>
-              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-preview">
-                <span>Web Preview</span>
-              </button>
-              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-chat">
-                <span>Chat</span>
-                <span id="badge-chat-unread" class="hidden w-2 h-2 rounded-full bg-violet-400"></span>
-              </button>
-              <button class="side-tab px-4 py-2.5 flex items-center gap-1.5 border-b-2 border-transparent text-zinc-400 hover:text-white" data-tab="tab-snapshots">
-                <span>Snapshots</span>
-                <span id="badge-snapshots-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-700 text-zinc-300">0</span>
-              </button>
+            <div class="settings-group">
+              <label class="settings-label" for="setting-fontsize">Font Size</label>
+              <select id="setting-fontsize" class="settings-select">
+                <option value="12">12px</option>
+                <option value="14" selected>14px (Default)</option>
+                <option value="16">16px</option>
+                <option value="18">18px</option>
+              </select>
             </div>
 
-            <!-- Tab 1: Console -->
-            <div id="tab-console" class="tab-pane flex-1 flex flex-col overflow-hidden bg-[#0a0b10]">
-              <div class="p-2 border-b border-border-dim flex items-center justify-between text-xs">
-                <span class="text-zinc-400 font-mono">Execution Log</span>
-                <button id="btn-clear-console" class="text-zinc-500 hover:text-zinc-300 font-mono text-[11px]">Clear</button>
-              </div>
-              <div id="console-output" class="flex-1 p-3 font-mono text-xs overflow-y-auto space-y-2 select-text">
-                <div class="text-zinc-500 italic">// Console ready. Press Run (⌘+Enter) to execute your code.</div>
-              </div>
+            <div class="settings-group">
+              <label class="settings-label" for="setting-tabsize">Tab Size</label>
+              <select id="setting-tabsize" class="settings-select">
+                <option value="2" selected>2 Spaces</option>
+                <option value="4">4 Spaces</option>
+              </select>
             </div>
 
-            <!-- Tab 2: Live Web Preview -->
-            <div id="tab-preview" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-white">
-              <div class="bg-surface-elevated p-2 border-b border-border-dim flex items-center justify-between text-xs">
-                <span class="text-zinc-400 font-mono">Sandboxed HTML/CSS Preview</span>
-                <button id="btn-refresh-preview" class="text-violet-400 hover:text-violet-300 text-xs">↻ Refresh</button>
-              </div>
-              <iframe id="preview-iframe" class="w-full flex-1 border-0" sandbox="allow-scripts"></iframe>
+            <div class="settings-checkbox-row">
+              <span>Word Wrap</span>
+              <input type="checkbox" id="setting-wordwrap" checked>
             </div>
 
-            <!-- Tab 3: Room Chat -->
-            <div id="tab-chat" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-surface">
-              <div id="chat-messages-container" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
-                <div class="text-center text-zinc-500 text-[11px] my-2">Welcome to room chat! Synchronized across the internet.</div>
-              </div>
-              <div class="p-2 border-t border-border-dim bg-surface-elevated flex items-center gap-2">
-                <input 
-                  type="text" 
-                  id="input-chat-message" 
-                  placeholder="Type a message to collaborators..." 
-                  class="flex-1 bg-surface border border-border-dim rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
-                />
-                <button id="btn-send-chat" class="btn-primary px-3 py-1.5 rounded-lg text-xs font-semibold">Send</button>
-              </div>
+            <div class="settings-checkbox-row">
+              <span>Sound Effects</span>
+              <input type="checkbox" id="setting-sound" checked>
             </div>
 
-            <!-- Tab 4: Snapshots & History -->
-            <div id="tab-snapshots" class="tab-pane hidden flex-1 flex flex-col overflow-hidden bg-surface">
-              <div class="p-3 border-b border-border-dim flex items-center justify-between text-xs">
-                <span class="text-zinc-300 font-semibold">Server Checkpoints</span>
-                <button id="btn-create-snapshot-modal" class="text-violet-400 hover:text-violet-300 font-medium">+ New</button>
+            <div class="settings-group" style="border-top: 1px solid var(--cs-border); padding-top: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="settings-label" style="margin-bottom: 0;">Backend WebSocket Relay</label>
+                <button type="button" id="btn-test-server-ping" style="font-size: 10px; color: var(--cs-coral); background: rgba(235,77,75,0.1); padding: 2px 6px; border-radius: 3px;">Test Ping</button>
               </div>
-              <div id="snapshots-list" class="flex-1 p-3 overflow-y-auto space-y-2"></div>
+              <input type="text" id="setting-server-url" placeholder="wss://your-backend.workers.dev" class="settings-input">
+              <p style="font-size: 11px; color: #7d8697; margin-top: 5px; line-height: 1.4;">
+                GitHub Pages is static. For internet-wide pairing across different computers, enter your Cloudflare Worker or Render WebSocket relay.
+              </p>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <button id="btn-save-settings" class="btn-coral-cta" style="width: 100%; justify-content: center; padding: 9px;">Save Preferences</button>
             </div>
 
           </div>
         </div>
 
-      </section>
+        <!-- ================================================================ -->
+        <!-- SLIDEOUT DRAWER 2: CHAT & CONSOLE DRAWER                         -->
+        <!-- ================================================================ -->
+        <div id="drawer-chat" class="slideout-drawer closed">
+          <div class="drawer-header">
+            <span class="drawer-title" id="chat-drawer-title">Room Chat</span>
+            <button id="btn-close-drawer-chat" class="drawer-close-btn">✕</button>
+          </div>
+          
+          <div class="chat-container">
+            <div id="chat-messages-container" class="chat-messages-box">
+              <div class="chat-bubble">
+                <div class="chat-meta">
+                  <span class="chat-author" style="color: var(--cs-coral);">Codeshare</span>
+                  <span class="chat-time">Now</span>
+                </div>
+                <div>Welcome to real-time room chat! Messages are broadcast instantaneously to all peers.</div>
+              </div>
+            </div>
 
-    </main>
+            <div class="chat-input-bar">
+              <input type="text" id="input-chat-message" class="chat-input-field" placeholder="Type a message...">
+              <button id="btn-send-chat" class="chat-send-btn">Send</button>
+            </div>
+          </div>
+        </div>
 
-    <!-- Global Footer -->
-    <footer id="app-footer" class="border-t border-border-dim bg-surface/50 backdrop-blur-sm py-6 text-xs text-zinc-500">
-      <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <span class="font-extrabold text-zinc-300">CodeShift</span>
+        <!-- ================================================================ -->
+        <!-- SLIDEOUT DRAWER 3: CONSOLE & WEB PREVIEW DRAWER                  -->
+        <!-- ================================================================ -->
+        <div id="drawer-console" class="slideout-drawer closed" style="width: 440px;">
+          <div class="drawer-header">
+            <div style="display: flex; gap: 12px;">
+              <button id="tab-btn-console" style="font-weight: 600; color: #ffffff; border-bottom: 2px solid var(--cs-coral); padding-bottom: 2px;">Console</button>
+              <button id="tab-btn-preview" style="color: #9aa2b1;">Web Preview</button>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button id="btn-clear-console" style="font-size: 11px; color: #9aa2b1;" title="Clear console">Clear</button>
+              <button id="btn-refresh-preview" style="font-size: 11px; color: #9aa2b1; display: none;" title="Refresh preview">↻</button>
+              <button id="btn-close-drawer-console" class="drawer-close-btn">✕</button>
+            </div>
+          </div>
+          
+          <div class="drawer-content" style="padding: 12px; height: 100%;">
+            <div id="console-output" class="console-box">
+              <div style="color: #64748b;">// Console ready. Press Run (⌘+Enter) to execute your code.</div>
+            </div>
+            <iframe id="preview-iframe" class="hidden" sandbox="allow-scripts allow-modals" style="width: 100%; height: 360px; background: #ffffff; border-radius: 4px; border: none;"></iframe>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Status Bar -->
+      <footer class="room-bottom-bar">
+        <div class="bottom-bar-left">
+          <span id="cursor-position">Ln 1, Col 1</span>
           <span>•</span>
-          <span>Think together. Code without limits.</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <span>WebSocket & Edge Enabled</span>
+          <span id="code-stats">0 lines</span>
           <span>•</span>
-          <span class="text-zinc-400">© 2026 CodeShift</span>
+          <span id="sync-status">Live WebSocket</span>
         </div>
-      </div>
-    </footer>
-
-  </div>
-
-  <!-- ============================================== -->
-  <!-- MODALS                                         -->
-  <!-- ============================================== -->
-
-  <!-- Password Prompt Modal (For protected rooms) -->
-  <div id="modal-password" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4">
-    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-      <div class="text-center space-y-1">
-        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-2">
-          🔒
+        <div class="bottom-bar-right">
+          <span>Codeshare Engine ⚡</span>
+          <span>•</span>
+          <a href="#/privacy" style="color: inherit;">Privacy</a>
+          <span>•</span>
+          <a href="#/terms" style="color: inherit;">Terms</a>
         </div>
-        <h3 class="text-base font-bold text-white">Password Protected Room</h3>
-        <p class="text-xs text-zinc-400">This CodeShift session requires a room password to enter.</p>
-      </div>
-      <input type="password" id="input-room-password" class="w-full bg-surface border border-border-dim rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 font-mono" placeholder="Enter password...">
-      <div id="password-error" class="hidden text-[11px] text-rose-400 text-center">Incorrect password. Please try again.</div>
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button id="btn-cancel-password" class="px-3 py-1.5 text-xs text-zinc-400 hover:text-white">Back to Home</button>
-        <button id="btn-submit-password" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Unlock Room</button>
-      </div>
+      </footer>
+
     </div>
-  </div>
 
-  <!-- Set Room Password Modal (Host Only) -->
-  <div id="modal-set-password" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-      <h3 class="text-base font-bold text-white">Room Password Protection</h3>
-      <p class="text-xs text-zinc-400">Set a password to restrict room access, or leave blank to make it public.</p>
-      <input type="text" id="input-new-room-password" class="w-full bg-surface border border-border-dim rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 font-mono" placeholder="New password (or leave empty)">
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button id="btn-cancel-set-password" class="px-3 py-1.5 text-xs text-zinc-400 hover:text-white">Cancel</button>
-        <button id="btn-save-room-password" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Save Setting</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Snapshot Diff Modal -->
-  <div id="modal-diff" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="p-4 border-b border-border-dim flex items-center justify-between">
-        <div>
-          <h3 class="text-base font-bold text-white" id="diff-modal-title">Snapshot Diff Comparison</h3>
-          <p class="text-xs text-zinc-400" id="diff-modal-subtitle">Comparing snapshot against current editor buffer</p>
+    <!-- ==================================================================== -->
+    <!-- MODAL DIALOGS                                                        -->
+    <!-- ==================================================================== -->
+
+    <!-- 1. Share Modal (Clean Codeshare Popup) -->
+    <div id="modal-share" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h3 class="modal-heading">Share Code with Developers</h3>
+          <button id="btn-close-share" class="drawer-close-btn">✕</button>
         </div>
-        <button id="btn-close-diff-modal" class="text-zinc-400 hover:text-white p-1">✕</button>
-      </div>
-      <div id="diff-viewer" class="flex-1 p-4 font-mono text-xs overflow-auto bg-[#0a0b10] space-y-1"></div>
-      <div class="p-3 border-t border-border-dim bg-surface flex items-center justify-end gap-3">
-        <button id="btn-close-diff" class="px-4 py-1.5 rounded-lg border border-border-dim text-xs text-zinc-300 hover:text-white">Close</button>
-        <button id="btn-restore-diff-snapshot" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Restore This Version</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Nickname Change Modal -->
-  <div id="modal-nickname" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-      <h3 class="text-base font-bold text-white">Change Display Name</h3>
-      <p class="text-xs text-zinc-400">Your name will be visible to everyone in this CodeShift room.</p>
-      <input type="text" id="input-new-nickname" class="w-full bg-surface border border-border-dim rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" placeholder="e.g. Kaushal">
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button id="btn-cancel-nickname" class="px-3 py-1.5 text-xs text-zinc-400 hover:text-white">Cancel</button>
-        <button id="btn-save-nickname" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Save Name</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="modal-settings" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-surface-elevated border border-border-highlight rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-      <div class="flex items-center justify-between border-b border-border-dim pb-3">
-        <h3 class="text-base font-bold text-white">Editor Preferences</h3>
-        <button id="btn-close-settings" class="text-zinc-400 hover:text-white">✕</button>
-      </div>
-      
-      <div class="space-y-4 text-xs">
-        <div class="flex items-center justify-between">
-          <label class="text-zinc-300 font-medium">Font Size</label>
-          <select id="setting-fontsize" class="bg-surface border border-border-dim rounded-lg px-2.5 py-1 text-white">
-            <option value="12">12px</option>
-            <option value="14" selected>14px (Default)</option>
-            <option value="16">16px</option>
-            <option value="18">18px</option>
-          </select>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label class="text-zinc-300 font-medium">Tab Size</label>
-          <select id="setting-tabsize" class="bg-surface border border-border-dim rounded-lg px-2.5 py-1 text-white">
-            <option value="2" selected>2 Spaces</option>
-            <option value="4">4 Spaces</option>
-          </select>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label class="text-zinc-300 font-medium">Word Wrap</label>
-          <input type="checkbox" id="setting-wordwrap" checked class="rounded border-zinc-700 text-violet-600 focus:ring-violet-500">
-        </div>
-
-        <div class="flex items-center justify-between">
-          <label class="text-zinc-300 font-medium">Sound Effects</label>
-          <input type="checkbox" id="setting-sound" checked class="rounded border-zinc-700 text-violet-600 focus:ring-violet-500">
-        </div>
-
-        <!-- Backend Server Relay -->
-        <div class="pt-3 border-t border-border-dim space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="text-zinc-300 font-medium">Backend WebSocket Server</label>
-            <button type="button" id="btn-test-server-ping" class="text-[10px] text-violet-400 hover:text-violet-300 font-mono bg-violet-950/40 border border-violet-500/30 px-2 py-0.5 rounded transition-all">Test Ping</button>
+        <div class="modal-body">
+          <p class="modal-subtext">Anyone with this link will be able to see and edit your code in real-time. Share it with friends or students.</p>
+          <div class="share-input-group">
+            <input type="text" id="input-share-link" class="share-url-input" readonly>
+            <button id="btn-modal-copy-link" class="btn-coral-copy">Copy Link</button>
           </div>
-          <input type="text" id="setting-server-url" placeholder="e.g. wss://your-backend.workers.dev or empty for local" class="w-full bg-surface border border-border-dim rounded-lg px-2.5 py-1.5 text-white placeholder-zinc-500 text-xs focus:border-violet-500 focus:outline-none">
-          <p class="text-[10px] text-zinc-400 leading-relaxed">
-            GitHub Pages is static. For internet-wide live pairing across different computers, enter your Cloudflare Worker or Render WebSocket endpoint.
-          </p>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-modal-done-share" class="btn-modal-confirm">Done</button>
         </div>
       </div>
+    </div>
 
-      <div class="pt-2 flex justify-end">
-        <button id="btn-save-settings" class="btn-primary px-4 py-2 rounded-lg text-xs font-semibold">Done</button>
+    <!-- 2. Settings Modal Compatibility Wrapper -->
+    <div id="modal-settings" class="hidden">
+      <button id="btn-close-settings" class="hidden"></button>
+    </div>
+
+    <!-- 3. Change Nickname Modal -->
+    <div id="modal-nickname" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h3 class="modal-heading">Change Display Name</h3>
+          <button id="btn-cancel-nickname" class="drawer-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-subtext">Your name will be visible to everyone in this Codeshare room.</p>
+          <input type="text" id="input-new-nickname" class="share-url-input" placeholder="Your name (e.g. Kaushal)" maxlength="24">
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-nickname-2" class="btn-modal-cancel">Cancel</button>
+          <button id="btn-save-nickname" class="btn-modal-confirm">Save Name</button>
+        </div>
       </div>
     </div>
+
+    <!-- 4. Room Password Protect Modal -->
+    <div id="modal-set-password" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h3 class="modal-heading">Room Password Protection</h3>
+          <button id="btn-cancel-set-password" class="drawer-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-subtext">Set a password to restrict room access, or leave blank to make it public.</p>
+          <input type="password" id="input-new-room-password" class="share-url-input" placeholder="Enter password (leave blank for open access)">
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-set-password-2" class="btn-modal-cancel">Cancel</button>
+          <button id="btn-save-room-password" class="btn-modal-confirm">Save Password</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Password Prompt Modal (When entering locked room) -->
+    <div id="modal-password" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h3 class="modal-heading">🔒 Password Protected Room</h3>
+          <button id="btn-cancel-password" class="drawer-close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-subtext">This Codeshare session requires a password to enter.</p>
+          <input type="password" id="input-room-password" class="share-url-input" placeholder="Enter room password">
+          <p id="password-error" class="hidden" style="color: var(--cs-coral); font-size: 12px; margin-top: 6px;">Incorrect password. Please try again.</p>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-password-2" class="btn-modal-cancel">Back to Home</button>
+          <button id="btn-submit-password" class="btn-modal-confirm">Unlock Room</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Diff & Snapshot Comparison Modal -->
+    <div id="modal-diff" class="modal-backdrop hidden">
+      <div class="modal-card" style="max-width: 700px;">
+        <div class="modal-top">
+          <div>
+            <h3 id="diff-modal-title" class="modal-heading">Snapshot Diff Comparison</h3>
+            <span id="diff-modal-subtitle" style="font-size: 11px; color: #9aa2b1;">Comparing against current buffer</span>
+          </div>
+          <button id="btn-close-diff-modal" class="drawer-close-btn">✕</button>
+        </div>
+        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+          <div id="diff-viewer" style="font-family: var(--cs-font-mono); font-size: 12px; line-height: 1.6;"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-close-diff" class="btn-modal-cancel">Close</button>
+          <button id="btn-restore-diff-snapshot" class="btn-modal-confirm">Restore This Version</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="app.js"></script>
