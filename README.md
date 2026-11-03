@@ -13,7 +13,7 @@
 
 👉 **Try it Live**: [https://kaushalboii.github.io/codeshift/](https://kaushalboii.github.io/codeshift/)
 
-![CodeShift Preview & Real-Time Sync Simulation](./brand/preview.svg)
+![CodeShift Preview & Real-Time Sync Simulation](./public/preview.svg)
 
 ---
 
@@ -27,7 +27,7 @@ All code edits are compressed client-side with LZW and encrypted locally in your
 
 ## ✨ Key Features
 
-- **🚀 Zero Login Friction**: Open a room URL (e.g. `kaushalboii.github.io/codeshift/#/my-room`) and immediately start typing. No sign-up barriers.
+- **🚀 Zero Login Friction**: Open a room URL (e.g. `kaushalboii.github.io/codeshift/my-room`) and immediately start typing. No sign-up barriers.
 - **🔒 Client-Side Payload Encryption**: Payloads are encrypted and compressed on the client before being sent across the wire. Cloud databases store only ciphertext.
 - **👥 Live Collaborative Presence**:
   - Remote cursors with active line tinting and name tags (`[ Anonymous 17 ]`).
@@ -127,19 +127,13 @@ codeshift/
 ├── index.html           # Single-Page Application (Landing + Monaco Editor + Modals)
 ├── styles.css           # Minimal Black & White typography, themes & animations
 ├── app.js               # Reactive router, Monaco setup, encryption & Firebase sync
-├── 404.html             # GitHub Pages SPA hash routing redirect
+├── 404.html             # GitHub Pages SPA path routing redirect
 ├── package.json         # Static metadata and local serve scripts
 ├── README.md            # Comprehensive documentation & setup guide
-├── brand/
-│   ├── preview.svg      # Visual architecture & interface simulation banner
-│   ├── logo-mark.svg    # Vector brand icon mark
-│   ├── logo-full.svg    # Full vector wordmark
-│   └── favicon.svg      # Site favicon
 └── public/
-    ├── preview.svg      # Static asset preview
-    ├── logo.svg         # Public logo
-    ├── favicon.svg      # Public favicon
-    └── moon-poster.jpg  # Background aesthetic asset
+    ├── favicon.svg      # Vector browser tab favicon [>_]
+    ├── logo.svg         # Clean developer terminal logo mark [>_]
+    └── preview.svg      # Real-time sync architecture simulation banner
 ```
 
 ---
