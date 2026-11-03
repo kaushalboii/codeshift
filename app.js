@@ -20,6 +20,7 @@
     userId: localStorage.getItem('codeshift_user_id') || ('usr_' + Math.random().toString(36).substring(2, 9)),
     userName: localStorage.getItem('codeshift_user_name') || 'Kaushal',
     userColor: localStorage.getItem('codeshift_user_color') || getRandomColor(),
+    serverUrl: localStorage.getItem('codeshift_ws_server') || (window.CODESHIFT_WS_SERVER || ''),
     isHost: false,
     isReadOnly: false,
     isProtected: false,
@@ -359,7 +360,13 @@ ORDER BY active_collaborators DESC;`
     settingFontsize: document.getElementById('setting-fontsize'),
     settingTabsize: document.getElementById('setting-tabsize'),
     settingWordwrap: document.getElementById('setting-wordwrap'),
-    settingSound: document.getElementById('setting-sound')
+    settingSound: document.getElementById('setting-sound'),
+    settingServerUrl: document.getElementById('setting-server-url'),
+    btnTestServerPing: document.getElementById('btn-test-server-ping'),
+    connectionNoticeBanner: document.getElementById('connection-notice-banner'),
+    connectionNoticeText: document.getElementById('connection-notice-text'),
+    btnBannerConfigServer: document.getElementById('btn-banner-config-server'),
+    btnBannerDismiss: document.getElementById('btn-banner-dismiss')
   };
 
   // --- Router ---
@@ -369,10 +376,32 @@ ORDER BY active_collaborators DESC;`
   }
 
   function handleRoute() {
-    const hash = window.location.hash.slice(1);
-    if (hash.startsWith('/room/')) {
-      const parts = hash.split('/');
-      const roomId = parts[2] ? parts[2].trim() : 'general';
+    // Check URL search or hash for server relay parameter
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const sParam = searchParams.get('server');
+      if (sParam && sParam !== state.serverUrl) {
+        state.serverUrl = sParam;
+        localStorage.setItem('codeshift_ws_server', sParam);
+      }
+    } catch (e) {}
+
+    const rawHash = window.location.hash.slice(1);
+    const [pathPart, queryPart] = rawHash.split('?');
+    if (queryPart) {
+      try {
+        const hashParams = new URLSearchParams(queryPart);
+        const sParam = hashParams.get('server');
+        if (sParam && sParam !== state.serverUrl) {
+          state.serverUrl = sParam;
+          localStorage.setItem('codeshift_ws_server', sParam);
+        }
+      } catch (e) {}
+    }
+
+    if (pathPart && pathPart.startsWith('/room/')) {
+      const parts = pathPart.split('/');
+      const roomId = parts[2] ? decodeURIComponent(parts[2].trim()) : 'general';
       enterRoom(roomId);
     } else {
       enterLanding();
@@ -590,22 +619,41 @@ ORDER BY active_collaborators DESC;`
 
   // --- Real-Time WebSocket Collaborative Engine ---
   function getWebSocketUrl(roomId) {
-    // If custom server set
-    if (window.CODESHIFT_WS_SERVER) {
-      return `${window.CODESHIFT_WS_SERVER}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
+    // 1. Explicit custom server (configured in Settings, URL param, or localStorage)
+    const customServer = (state.serverUrl || localStorage.getItem('codeshift_ws_server') || window.CODESHIFT_WS_SERVER || '').trim();
+    if (customServer) {
+      let clean = customServer.replace(/\/$/, '');
+      if (clean.startsWith('http://')) clean = 'ws://' + clean.slice(7);
+      else if (clean.startsWith('https://')) clean = 'wss://' + clean.slice(8);
+      else if (!clean.startsWith('ws://') && !clean.startsWith('wss://')) {
+        clean = (location.protocol === 'https:' ? 'wss://' : 'ws://') + clean;
+      }
+      return `${clean}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
     }
 
     const isSecure = location.protocol === 'https:';
     const wsProto = isSecure ? 'wss:' : 'ws:';
     const host = location.host;
 
-    // If running on local server or production VPS
+    // 2. If running on local server (e.g. localhost:3000) or custom domain VPS
     if (host && !host.includes('github.io')) {
       return `${wsProto}//${host}/ws/room/${roomId}?userId=${state.userId}&userName=${encodeURIComponent(state.userName)}&userColor=${encodeURIComponent(state.userColor)}`;
     }
 
-    // Static GitHub Pages fallback endpoint or broadcast
+    // 3. Static GitHub Pages fallback endpoint or broadcast
     return null;
+  }
+
+  function showConnectionBanner(show, text) {
+    if (!el.connectionNoticeBanner) return;
+    if (show) {
+      if (text && el.connectionNoticeText) el.connectionNoticeText.textContent = text;
+      el.connectionNoticeBanner.classList.remove('hidden');
+      el.connectionNoticeBanner.classList.add('flex');
+    } else {
+      el.connectionNoticeBanner.classList.add('hidden');
+      el.connectionNoticeBanner.classList.remove('flex');
+    }
   }
 
   function connectWebSocket(roomId) {
@@ -616,10 +664,13 @@ ORDER BY active_collaborators DESC;`
     if (!wsUrl) {
       // Running on static GitHub Pages without backend: activate BroadcastChannel
       activateBroadcastChannel(roomId);
-      setConnectionStatus('local', 'Broadcast Sync (Same Device)');
+      setConnectionStatus('local', 'Local Tabs Sync');
+      const isGH = location.host.includes('github.io');
+      showConnectionBanner(isGH, 'Static GitHub Pages: Syncing across local tabs. To pair across different computers, connect a WebSocket server.');
       return;
     }
 
+    showConnectionBanner(false);
     setConnectionStatus('connecting', 'Connecting...');
 
     try {
@@ -629,6 +680,7 @@ ORDER BY active_collaborators DESC;`
         state.wsConnected = true;
         state.wsReconnectAttempts = 0;
         setConnectionStatus('connected', 'Live WebSocket');
+        showConnectionBanner(false);
         showToast('Connected to CodeShift Internet Room ⚡', 'success');
       };
 
@@ -657,10 +709,12 @@ ORDER BY active_collaborators DESC;`
         // Fallback to BroadcastChannel
         activateBroadcastChannel(roomId);
         setConnectionStatus('local', 'Local Sync (Offline)');
+        showConnectionBanner(true, 'WebSocket connection failed. Falling back to local device sync. Check backend server in Preferences.');
       };
     } catch (e) {
       activateBroadcastChannel(roomId);
       setConnectionStatus('local', 'Local Sync (Offline)');
+      showConnectionBanner(true, 'Could not establish WebSocket. Using local sync.');
     }
   }
 
@@ -1327,10 +1381,15 @@ ORDER BY active_collaborators DESC;`
 
   // Copy share link
   function copyShareLink() {
-    const url = window.location.href;
+    let url = window.location.href;
+    const customServer = (state.serverUrl || localStorage.getItem('codeshift_ws_server') || '').trim();
+    if (customServer && !url.includes('server=')) {
+      const sep = url.includes('?') ? '&' : '?';
+      url = `${url}${sep}server=${encodeURIComponent(customServer)}`;
+    }
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
-        showToast('Room link copied! Share with collaborators anywhere 📋', 'success');
+        showToast('Room link copied! Collaborators will connect directly 📋', 'success');
       });
     } else {
       prompt('Copy this room URL:', url);
@@ -1464,6 +1523,9 @@ ORDER BY active_collaborators DESC;`
     el.settingTabsize.value = state.settings.tabSize;
     el.settingWordwrap.checked = state.settings.wordWrap;
     el.settingSound.checked = state.settings.sound;
+    if (el.settingServerUrl) {
+      el.settingServerUrl.value = state.serverUrl || localStorage.getItem('codeshift_ws_server') || '';
+    }
     el.modalSettings.classList.remove('hidden');
     el.modalSettings.classList.add('flex');
   });
@@ -1482,6 +1544,16 @@ ORDER BY active_collaborators DESC;`
     localStorage.setItem('cs_wordWrap', state.settings.wordWrap);
     localStorage.setItem('cs_sound', state.settings.sound);
 
+    // Save server URL preference
+    const oldServer = state.serverUrl;
+    const newServer = el.settingServerUrl ? el.settingServerUrl.value.trim() : '';
+    state.serverUrl = newServer;
+    if (newServer) {
+      localStorage.setItem('codeshift_ws_server', newServer);
+    } else {
+      localStorage.removeItem('codeshift_ws_server');
+    }
+
     if (state.monacoInstance) {
       state.monacoInstance.updateOptions({
         fontSize: state.settings.fontSize,
@@ -1490,10 +1562,69 @@ ORDER BY active_collaborators DESC;`
       });
     }
 
+    // Reconnect WebSocket if server changed while in an active room
+    if (newServer !== oldServer && state.roomId) {
+      showToast('Reconnecting to updated server...', 'info');
+      connectWebSocket(state.roomId);
+    }
+
     el.modalSettings.classList.add('hidden');
     el.modalSettings.classList.remove('flex');
     showToast('Preferences updated!', 'success');
   });
+
+  // Test Server Ping Button
+  if (el.btnTestServerPing) {
+    el.btnTestServerPing.addEventListener('click', async () => {
+      const val = (el.settingServerUrl.value || '').trim();
+      if (!val) {
+        showToast('Please enter a server URL to ping', 'error');
+        return;
+      }
+      let httpUrl = val.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://').replace(/\/$/, '');
+      if (!httpUrl.startsWith('http://') && !httpUrl.startsWith('https://')) {
+        httpUrl = (location.protocol === 'https:' ? 'https://' : 'http://') + httpUrl;
+      }
+      try {
+        el.btnTestServerPing.textContent = 'Testing...';
+        const res = await fetch(`${httpUrl}/api/health`, { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Backend online (${data.provider || 'active'}) ⚡`, 'success');
+        } else {
+          showToast(`Server responded with HTTP ${res.status}`, 'error');
+        }
+      } catch (e) {
+        showToast('Could not reach server: ' + e.message, 'error');
+      } finally {
+        el.btnTestServerPing.textContent = 'Test Ping';
+      }
+    });
+  }
+
+  // Global connection pill click triggers settings
+  if (el.globalConnectionPill) {
+    el.globalConnectionPill.style.cursor = 'pointer';
+    el.globalConnectionPill.title = 'Click to configure WebSocket backend relay';
+    el.globalConnectionPill.addEventListener('click', () => {
+      el.btnOpenSettings.click();
+    });
+  }
+
+  // Banner Actions
+  if (el.btnBannerConfigServer) {
+    el.btnBannerConfigServer.addEventListener('click', () => {
+      el.btnOpenSettings.click();
+    });
+  }
+  if (el.btnBannerDismiss) {
+    el.btnBannerDismiss.addEventListener('click', () => {
+      if (el.connectionNoticeBanner) {
+        el.connectionNoticeBanner.classList.add('hidden');
+        el.connectionNoticeBanner.classList.remove('flex');
+      }
+    });
+  }
 
   // Initialize Application
   initRouter();

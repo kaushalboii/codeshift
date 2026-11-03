@@ -235,6 +235,18 @@
       <!-- ============================================== -->
       <section id="view-room" class="hidden flex-1 flex flex-col overflow-hidden">
         
+        <!-- Connection Notice Banner (Shown on static hosts or offline mode) -->
+        <div id="connection-notice-banner" class="hidden bg-violet-950/40 border-b border-violet-500/20 px-4 py-2 text-xs text-violet-200 items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span>📡</span>
+            <span id="connection-notice-text">Static GitHub Pages Mode: Syncing across local tabs. To pair across different computers, connect a WebSocket backend.</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-banner-config-server" class="px-2.5 py-0.5 rounded bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/30 font-medium text-[11px] transition-colors">Configure Server</button>
+            <button id="btn-banner-dismiss" class="text-zinc-400 hover:text-white text-xs px-1">✕</button>
+          </div>
+        </div>
+
         <!-- View-Only Lock Banner (Shown when host locks room) -->
         <div id="readonly-banner" class="hidden bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-300 items-center justify-between">
           <div class="flex items-center gap-2 font-medium">
@@ -583,6 +595,18 @@
         <div class="flex items-center justify-between">
           <label class="text-zinc-300 font-medium">Sound Effects</label>
           <input type="checkbox" id="setting-sound" checked class="rounded border-zinc-700 text-violet-600 focus:ring-violet-500">
+        </div>
+
+        <!-- Backend Server Relay -->
+        <div class="pt-3 border-t border-border-dim space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-zinc-300 font-medium">Backend WebSocket Server</label>
+            <button type="button" id="btn-test-server-ping" class="text-[10px] text-violet-400 hover:text-violet-300 font-mono bg-violet-950/40 border border-violet-500/30 px-2 py-0.5 rounded transition-all">Test Ping</button>
+          </div>
+          <input type="text" id="setting-server-url" placeholder="e.g. wss://your-backend.workers.dev or empty for local" class="w-full bg-surface border border-border-dim rounded-lg px-2.5 py-1.5 text-white placeholder-zinc-500 text-xs focus:border-violet-500 focus:outline-none">
+          <p class="text-[10px] text-zinc-400 leading-relaxed">
+            GitHub Pages is static. For internet-wide live pairing across different computers, enter your Cloudflare Worker or Render WebSocket endpoint.
+          </p>
         </div>
       </div>
 

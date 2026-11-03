@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local Persistence & Data
+.data/
+*.log
+
+# Temporary & Archive Files
+*.zip
+.DS_Store
+
+# Cloudflare Wrangler & Secrets
+.wrangler/
+.env
+.env.*
+
+# Build artifacts & cache
+dist/
+.cache/
