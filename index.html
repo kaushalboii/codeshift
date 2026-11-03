@@ -78,7 +78,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=2.3">
+  <link rel="stylesheet" href="styles.css?v=2.4">
 
   <style>
     /* ============================================================
@@ -833,30 +833,27 @@
       color: #888888;
     }
 
-    .ide-breadcrumbs {
+    .ide-room-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 11.5px;
-      color: #666666;
+      font-weight: 600;
+      color: #ffffff;
       background: #141414;
-      padding: 3px 10px;
-      border-radius: 4px;
+      padding: 4px 10px;
+      border-radius: 5px;
       border: 1px solid #222222;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    .bc-root { color: #888888; }
-    .bc-sep { color: #444444; }
-    .bc-item {
+    .ide-room-pill:hover {
+      background: #202020;
+      border-color: #ffffff;
       color: #ffffff;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
     }
-    .bc-item:hover { text-decoration: underline; }
-    .bc-file { color: #ffffff; font-weight: 600; }
 
     .ide-save-pill {
       display: inline-flex;
@@ -1038,7 +1035,7 @@
     }
 
     @media (max-width: 768px) {
-      .ide-breadcrumbs { display: none; }
+      .ide-room-pill { padding: 3px 7px; font-size: 10.5px; }
       .ide-status-bar .status-right { display: none; }
     }
   </style>
@@ -1180,17 +1177,11 @@
             <span class="ide-brand-name">Code<span class="ide-brand-shift">Shift</span></span>
           </a>
 
-          <!-- Breadcrumbs bar -->
-          <div class="ide-breadcrumbs">
-            <span class="bc-root">codeshift</span>
-            <span class="bc-sep">/</span>
-            <span class="bc-item" id="btn-copy-room-link" title="Click to copy room link">
-              <span class="bc-icon">🔗</span>
-              <span id="room-nav-id">/room</span>
-            </span>
-            <span class="bc-sep">/</span>
-            <span class="bc-file" id="ide-active-filename">main.ts</span>
-          </div>
+          <!-- Room Badge / Click to copy room URL -->
+          <button class="ide-room-pill" id="btn-copy-room-link" title="Click to copy room link">
+            <span class="bc-icon">🔗</span>
+            <span id="room-nav-id">/room</span>
+          </button>
 
           <!-- Cloud sync status indicator -->
           <div class="ide-save-pill" id="save-status-container" title="Local + Cloud encrypted synchronization">
@@ -1416,7 +1407,7 @@
     <option value="javascript">JavaScript</option>
   </select>
 
-  <script defer src="app.js?v=2.3"></script>
+  <script defer src="app.js?v=2.4"></script>
 </body>
 
 </html>
