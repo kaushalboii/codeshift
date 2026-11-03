@@ -719,163 +719,70 @@
       mouseState.prevX = mouseState.x;
       mouseState.prevY = mouseState.y;
 
-      // ── BACKGROUND (Deep dark petrol-black void as in Image 3) ──
+      // ── BACKGROUND (Deep dark petrol-black void matching Image 3) ──
       const isMobile = W < 768;
       const bg = ctx.createLinearGradient(0, 0, 0, H);
       bg.addColorStop(0,    '#010d10');
-      bg.addColorStop(0.42, '#021619');
-      bg.addColorStop(0.70, '#021c20');
-      bg.addColorStop(1,    '#010e11');
+      bg.addColorStop(0.35, '#021518');
+      bg.addColorStop(0.70, '#021b1f');
+      bg.addColorStop(1,    '#010c0f');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      const horizonY = H * (isMobile ? 0.44 : 0.47);
+      // ── FULL-PAGE 3D GLOWING TEAL PARTICLE WAVE PLATFORM (IMAGE 3) ──
+      // Spans the entire screen with flowing 3D perspective sine waves and live air-breather physics
+      const COLS = isMobile ? 48 : 72;
+      const ROWS = isMobile ? 38 : 54;
+      const fov = 330;
 
-      // ── MOON (TOP HALF) ──
-      const moonX = W * 0.5;
-      const moonY = H * (isMobile ? 0.22 : 0.25);
-      const moonR = Math.min(W, H) * (isMobile ? 0.13 : 0.12);
-
-      // Outer atmospheric halo
-      const haloR = moonR * 3.8;
-      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.3, moonX, moonY, haloR);
-      halo.addColorStop(0,    'rgba(140, 235, 225, 0.24)');
-      halo.addColorStop(0.35, 'rgba(60, 200, 195, 0.10)');
-      halo.addColorStop(0.75, 'rgba(20, 120, 115, 0.03)');
-      halo.addColorStop(1,    'rgba(0,0,0,0)');
-      ctx.fillStyle = halo;
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, haloR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Moon soft core radiance
-      const coreG = ctx.createRadialGradient(moonX, moonY, moonR * 0.1, moonX, moonY, moonR * 1.15);
-      coreG.addColorStop(0,   'rgba(220, 255, 252, 0.32)');
-      coreG.addColorStop(0.6, 'rgba(100, 220, 215, 0.12)');
-      coreG.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.fillStyle = coreG;
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, moonR * 1.15, 0, Math.PI * 2);
-      ctx.fill();
-
-      // ── OP-ART SCANLINES THROUGH SKY & MOON (UPPER HALF) ──
-      const lineSpacing = isMobile ? 4.2 : 3.4;
-      const xSampleStep = Math.max(3, Math.ceil(W / 220));
-
-      for (let scanY = 3; scanY <= horizonY + 2; scanY += lineSpacing) {
-        const normY = scanY / horizonY;
-        const lineAlpha = 0.20 + 0.16 * Math.sin(normY * Math.PI);
-
-        ctx.strokeStyle = `rgba(50, 150, 155, ${lineAlpha})`;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        let firstPt = true;
-
-        for (let x = 0; x <= W + xSampleStep; x += xSampleStep) {
-          let y = scanY;
-
-          // 3D Moon sphere distortion
-          const dxM = x - moonX;
-          const dyM = scanY - moonY;
-          const distM = Math.hypot(dxM, dyM);
-          if (distM < moonR) {
-            const zN = Math.sqrt(Math.max(0, 1 - (distM / moonR) * (distM / moonR)));
-            const tiltY = ((mouseState.y - moonY) / (H * 0.5)) * 18 * zN;
-            const lensBulge = -(zN * zN) * (dyM / moonR) * moonR * 0.44;
-            y += lensBulge + tiltY;
-          }
-
-          // Subtle breeze from mouse
-          const dMouse = Math.hypot(x - mouseState.x, scanY - mouseState.y);
-          if (dMouse < 200) {
-            const fo = Math.cos((dMouse / 200) * (Math.PI / 2));
-            y += Math.sin(dMouse * 0.05 - time * 3.5) * 10 * fo;
-          }
-
-          if (firstPt) { ctx.moveTo(x, y); firstPt = false; }
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        // Luminous moon-surface highlight on lines passing through moon
-        const dyCenter = Math.abs(scanY - moonY);
-        if (dyCenter < moonR) {
-          const halfW = Math.sqrt(moonR * moonR - dyCenter * dyCenter);
-          const x0 = Math.max(0, moonX - halfW);
-          const x1 = Math.min(W, moonX + halfW);
-          ctx.save();
-          ctx.strokeStyle = 'rgba(215, 255, 255, 0.94)';
-          ctx.lineWidth = 1.35;
-          ctx.beginPath();
-          let moonFirst = true;
-          for (let mx = x0; mx <= x1; mx += xSampleStep) {
-            const dxM = mx - moonX;
-            const dyM = scanY - moonY;
-            const distM = Math.hypot(dxM, dyM);
-            const zN = Math.sqrt(Math.max(0, 1 - (distM / moonR) * (distM / moonR)));
-            const tiltY = ((mouseState.y - moonY) / (H * 0.5)) * 18 * zN;
-            const bulge = -(zN * zN) * (dyM / moonR) * moonR * 0.44;
-            const my = scanY + bulge + tiltY;
-            if (moonFirst) { ctx.moveTo(mx, my); moonFirst = false; }
-            else ctx.lineTo(mx, my);
-          }
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-
-      // ── 3D PERSPECTIVE GLOWING TEAL DOT-PARTICLE WAVE PLATFORM (IMAGE 3) ──
-      const COLS = isMobile ? 46 : 64;
-      const ROWS = isMobile ? 32 : 44;
-      const fov = 310;
-      const groundH = H - horizonY;
-
-      // Compute and draw 3D perspective terrain mesh rows
+      // Compute and draw 3D perspective terrain mesh rows across full screen
       for (let r = 0; r < ROWS; r++) {
-        const normR = r / (ROWS - 1); // 0 (far horizon) to 1 (near foreground)
-        const depthFade = Math.pow(normR, 0.62);
-        const worldZ = (1 - normR) * 640 + 65;
+        const normR = r / (ROWS - 1); // 0 (distant top horizon) to 1 (near bottom foreground)
+        const depthFade = Math.pow(normR, 0.60);
+        const worldZ = (1 - normR) * 760 + 65;
         const scale = fov / (worldZ + fov);
 
         const rowPoints = [];
 
         for (let c = 0; c < COLS; c++) {
           const normC = (c / (COLS - 1)) - 0.5; // -0.5 to +0.5
-          const worldX = normC * (W * 1.58);
+          const worldX = normC * (W * 1.68);
 
-          // Flowing 3D sine wave harmonics
-          const w1 = Math.sin(normC * 6.8 + time * 1.15) * 52;
-          const w2 = Math.cos(normR * 8.2 - time * 0.88) * 44;
-          const w3 = Math.sin((normC * 4.4 + normR * 5.8) + time * 0.68) * 32;
-          const w4 = Math.cos(normC * 11.2 - time * 1.35) * 16;
-          let elevation = w1 + w2 + w3 + w4;
+          // Flowing 3D wave harmonics spanning the full canvas
+          const w1 = Math.sin(normC * 7.2 + time * 1.18) * 60;
+          const w2 = Math.cos(normR * 8.4 - time * 0.88) * 50;
+          const w3 = Math.sin((normC * 4.5 + normR * 6.0) + time * 0.70) * 36;
+          const w4 = Math.cos(normC * 11.5 - time * 1.38) * 20;
+          const w5 = Math.sin(normR * 13.5 + time * 1.05) * 15;
+          let elevation = w1 + w2 + w3 + w4 + w5;
 
-          // Projected screen positions
+          // Projected screen position across full viewport
           const baseProjX = W * 0.5 + worldX * scale;
-          const baseProjY = horizonY + groundH * Math.pow(normR, 0.86) + elevation * scale;
+          const baseProjY = (H * 0.02) + (H * 1.02) * Math.pow(normR, 0.88) + elevation * scale;
 
-          // Live mouse reaction — dynamic fluid ripple & repulsion
+          // Live mouse reaction — dynamic fluid ripple & air-breather anywhere on page
           const dMouse = Math.hypot(baseProjX - mouseState.x, baseProjY - mouseState.y);
-          if (dMouse < 220) {
-            const force = Math.cos((dMouse / 220) * (Math.PI / 2));
-            const ripple = Math.sin(dMouse * 0.045 - time * 4.5) * 40 * force;
-            const breeze = force * 24 * Math.min(2.5, 0.4 + mouseState.speed * 0.12);
+          const mDist = 250;
+          if (dMouse < mDist) {
+            const force = Math.cos((dMouse / mDist) * (Math.PI / 2));
+            const ripple = Math.sin(dMouse * 0.044 - time * 4.6) * 46 * force;
+            const breeze = force * 28 * Math.min(2.5, 0.4 + mouseState.speed * 0.12);
             elevation += ripple - breeze;
           }
 
           const screenX = W * 0.5 + worldX * scale;
-          const screenY = horizonY + groundH * Math.pow(normR, 0.86) + elevation * scale;
+          const screenY = (H * 0.02) + (H * 1.02) * Math.pow(normR, 0.88) + elevation * scale;
 
           // Elevation normalized for wave ridge detection
-          const normElev = (elevation + 95) / 190;
+          const normElev = (elevation + 105) / 210;
           const crest = Math.max(0, Math.min(1, normElev));
 
           rowPoints.push({ screenX, screenY, crest, normR, depthFade });
         }
 
         // Draw fine flowing ribbon contour line connecting points in this row
-        ctx.strokeStyle = `rgba(0, 220, 210, ${0.06 + depthFade * 0.18})`;
-        ctx.lineWidth = 0.85;
+        ctx.strokeStyle = `rgba(0, 220, 210, ${0.05 + depthFade * 0.18})`;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
         for (let i = 0; i < rowPoints.length; i++) {
           const pt = rowPoints[i];
@@ -888,18 +795,18 @@
         for (let i = 0; i < rowPoints.length; i++) {
           const pt = rowPoints[i];
           const dotRadius = Math.max(0.65, (0.95 + pt.crest * 1.85) * (0.42 + pt.depthFade * 0.88));
-          const alpha = Math.min(1, (0.16 + pt.crest * 0.80) * (0.32 + pt.depthFade * 0.68));
+          const alpha = Math.min(1, (0.16 + pt.crest * 0.80) * (0.30 + pt.depthFade * 0.70));
 
-          if (pt.crest > 0.64) {
+          if (pt.crest > 0.62) {
             // Electric glowing cyan ridge (Image 3 signature crest highlight)
             ctx.fillStyle = `rgba(20, 255, 242, ${alpha})`;
-            ctx.shadowColor = 'rgba(0, 240, 225, 0.80)';
-            ctx.shadowBlur = Math.round(6 * pt.depthFade);
+            ctx.shadowColor = 'rgba(0, 240, 225, 0.85)';
+            ctx.shadowBlur = Math.round(7 * pt.depthFade);
           } else {
-            // Deep teal trough
-            const gVal = Math.round(130 + pt.crest * 105);
-            const bVal = Math.round(150 + pt.crest * 95);
-            ctx.fillStyle = `rgba(10, ${gVal}, ${bVal}, ${alpha * 0.85})`;
+            // Deep oceanic teal trough
+            const gVal = Math.round(120 + pt.crest * 110);
+            const bVal = Math.round(145 + pt.crest * 100);
+            ctx.fillStyle = `rgba(8, ${gVal}, ${bVal}, ${alpha * 0.82})`;
             ctx.shadowBlur = 0;
           }
 
