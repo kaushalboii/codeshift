@@ -37,20 +37,18 @@
     }
   };
 
-  localStorage.setItem('codeshift_uid', state.userId);
-
   function getUserIdentity() {
-    let uid = localStorage.getItem('codeshift_uid');
+    let uid = sessionStorage.getItem('codeshift_tab_uid');
     if (!uid) {
-      uid = 'anon_' + Math.random().toString(36).substring(2, 8);
-      localStorage.setItem('codeshift_uid', uid);
+      uid = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-3);
+      sessionStorage.setItem('codeshift_tab_uid', uid);
     }
     let hash = 0;
     for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
-    const anonNum = (hash % 89) + 11; // stable number e.g. 17 (like Screenshot 3)
+    const anonNum = (hash % 89) + 11; // stable number e.g. 17
 
     const colors = [
-      '#10b981', // emerald green (Screenshot 3 signature color)
+      '#10b981', // emerald green
       '#06b6d4', // cyan
       '#3b82f6', // blue
       '#8b5cf6', // purple
@@ -59,7 +57,8 @@
       '#14b8a6'  // teal
     ];
     const color = colors[hash % colors.length];
-    const name = localStorage.getItem('codeshift_nickname') || ('Anonymous ' + anonNum);
+    const savedName = localStorage.getItem('codeshift_nickname');
+    const name = savedName || ('Anonymous ' + anonNum);
     return { uid, name, color, anonNum };
   }
 
@@ -823,7 +822,7 @@
   }
 
   // ──────────────────────────────────────────────
-  // PRESENCE & CURSOR HEARTBEAT
+  // PRESENCE & CURSOR HEARTBEAT (Reliable multi-user sync)
   // ──────────────────────────────────────────────
   function presenceStart(roomId) {
     if (state.presenceTimer) clearInterval(state.presenceTimer);
@@ -832,10 +831,25 @@
     state.presenceTimer = setInterval(() => {
       presencePing(roomId);
       pollPresence(roomId);
-    }, 4500);
+    }, 4000);
   }
 
+  // Ping immediately when user focuses tab or visibility changes
+  window.addEventListener('focus', () => {
+    if (state.roomId) {
+      presencePing(state.roomId);
+      pollPresence(state.roomId);
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state.roomId) {
+      presencePing(state.roomId);
+      pollPresence(state.roomId);
+    }
+  });
+
   function presencePing(roomId) {
+    if (!roomId) return;
     const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence/' + state.userId + '.json';
     fetch(url, {
       method: 'PUT',
@@ -844,24 +858,34 @@
         ts: Date.now(),
         name: state.userName,
         color: state.userColor,
-        line: state.cursorLine,
-        col: state.cursorCol
+        line: state.cursorLine || 1,
+        col: state.cursorCol || 1
       })
     }).catch(() => {});
     if (state.broadcastChannel) {
-      state.broadcastChannel.postMessage({ type: 'PRESENCE', from: state.userId });
+      try {
+        state.broadcastChannel.postMessage({
+          type: 'PRESENCE',
+          from: state.userId,
+          name: state.userName,
+          color: state.userColor,
+          line: state.cursorLine || 1
+        });
+      } catch (e) {}
     }
   }
 
   function pollPresence(roomId) {
+    if (!roomId) return;
     fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence.json')
       .then(r => r.json())
       .then(map => {
         if (!map) { setOnline(1, []); return; }
         const now = Date.now();
-        const activeEntries = Object.entries(map).filter(([uid, v]) => v && (now - v.ts) < 20000);
+        // 50 seconds TTL: keeps users online even if background tab throttles setInterval!
+        const activeEntries = Object.entries(map).filter(([uid, v]) => v && (now - v.ts) < 50000);
 
-        // Render collaborative cursors for active remote users (Screenshot 3 style)
+        // Render collaborative cursors for active remote users
         const activeUids = new Set();
         const peers = [];
         activeEntries.forEach(([uid, data]) => {
@@ -887,29 +911,35 @@
 
   function setOnline(n, peerList = []) {
     if (el.onlineCount) el.onlineCount.textContent = n + ' online';
-    const peerCountEl = document.getElementById('sidebar-peer-count');
-    const actBadgeEl = document.getElementById('act-peers-count');
-    if (peerCountEl) peerCountEl.textContent = n;
-    if (actBadgeEl) actBadgeEl.textContent = n;
+    const peerNumEl = document.getElementById('peers-count-num');
+    if (peerNumEl) peerNumEl.textContent = n;
 
-    const list = document.getElementById('sidebar-peer-list');
-    if (list) {
+    // Render collaborators in dropdown list
+    const dropList = document.getElementById('peers-dropdown-list');
+    if (dropList) {
       let html = `
-        <div class="peer-item me">
-          <span class="peer-dot" style="background:#28c840;"></span>
-          <span class="peer-name">You (Host)</span>
+        <div class="peer-row">
+          <div class="peer-row-left">
+            <span class="peer-dot" style="background:${state.userColor || '#28c840'};"></span>
+            <span class="peer-name-text">${escapeHtml(state.userName || 'You')}</span>
+            <span class="peer-role-tag">You</span>
+          </div>
+          <span class="peer-loc-tag">Line ${state.cursorLine || 1}</span>
         </div>
       `;
       peerList.forEach(p => {
-        const lineInfo = p.line ? ` (Line ${p.line})` : '';
+        const lineText = p.line ? `Line ${p.line}` : 'Viewing';
         html += `
-          <div class="peer-item">
-            <span class="peer-dot" style="background:${p.color || '#10b981'};"></span>
-            <span class="peer-name">${escapeHtml(p.name || 'Anonymous')}${lineInfo}</span>
+          <div class="peer-row">
+            <div class="peer-row-left">
+              <span class="peer-dot" style="background:${p.color || '#3b82f6'};"></span>
+              <span class="peer-name-text">${escapeHtml(p.name || 'Anonymous')}</span>
+            </div>
+            <span class="peer-loc-tag">${lineText}</span>
           </div>
         `;
       });
-      list.innerHTML = html;
+      dropList.innerHTML = html;
     }
   }
 
@@ -1224,6 +1254,56 @@
   // Syntax switcher in status bar
   if (langSelectStatus) {
     langSelectStatus.addEventListener('change', (e) => setEditorLanguage(e.target.value));
+  }
+
+  // Collaborators Dropdown (View full collaborator names & set custom nickname)
+  const badgeBtn = document.getElementById('online-users-badge');
+  const peersMenu = document.getElementById('peers-dropdown');
+  const btnClosePeers = document.getElementById('btn-close-peers-dropdown');
+  const btnSaveNick = document.getElementById('btn-save-nickname');
+  const inputNick   = document.getElementById('input-my-nickname');
+
+  if (badgeBtn && peersMenu) {
+    badgeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      peersMenu.classList.toggle('hidden');
+      if (inputNick && state.userName) {
+        inputNick.value = state.userName;
+      }
+    });
+
+    if (btnClosePeers) {
+      btnClosePeers.addEventListener('click', (e) => {
+        e.stopPropagation();
+        peersMenu.classList.add('hidden');
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!peersMenu.contains(e.target) && !badgeBtn.contains(e.target)) {
+        peersMenu.classList.add('hidden');
+      }
+    });
+
+    if (btnSaveNick && inputNick) {
+      btnSaveNick.addEventListener('click', () => {
+        const val = inputNick.value.trim();
+        if (!val) return;
+        state.userName = val;
+        localStorage.setItem('codeshift_nickname', val);
+        if (state.roomId) {
+          presencePing(state.roomId);
+          pollPresence(state.roomId);
+        }
+        toast('Nickname set to "' + val + '"', 'success');
+      });
+
+      inputNick.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          btnSaveNick.click();
+        }
+      });
+    }
   }
 
   // Modal helpers — guaranteed to open/close cleanly

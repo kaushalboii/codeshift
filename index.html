@@ -78,7 +78,7 @@
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=2.4">
+  <link rel="stylesheet" href="styles.css?v=2.5">
 
   <style>
     /* ============================================================
@@ -867,6 +867,10 @@
       border: 1px solid #222222;
     }
 
+    .ide-top-center {
+      position: relative;
+    }
+
     .ide-presence-pill {
       display: inline-flex;
       align-items: center;
@@ -878,6 +882,167 @@
       border-radius: 100px;
       background: #111111;
       border: 1px solid #262626;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .ide-presence-pill:hover {
+      background: #1c1c1c;
+      border-color: #555555;
+    }
+
+    .presence-arrow {
+      font-size: 8px;
+      color: #777777;
+      margin-left: 1px;
+    }
+
+    /* COLLABORATORS POPUP */
+    .peers-dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 8px;
+      width: 270px;
+      background: #0d0d0d;
+      border: 1px solid #282828;
+      border-radius: 8px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.9);
+      z-index: 100;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .peers-dropdown-menu.hidden {
+      display: none !important;
+    }
+
+    .peers-dropdown-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #777777;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .peers-close-btn {
+      background: transparent;
+      border: none;
+      color: #666666;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    .peers-close-btn:hover { color: #ffffff; }
+
+    .peers-dropdown-body {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .peer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      background: #141414;
+      border: 1px solid #222222;
+      border-radius: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    .peer-row-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .peer-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .peer-name-text {
+      color: #ffffff;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .peer-role-tag {
+      font-size: 8.5px;
+      color: #28c840;
+      background: rgba(40, 200, 64, 0.12);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .peer-loc-tag {
+      font-size: 9.5px;
+      color: #888888;
+      flex-shrink: 0;
+    }
+
+    .peers-dropdown-footer {
+      border-top: 1px solid #1a1a1a;
+      padding-top: 8px;
+    }
+
+    .peer-name-edit-box {
+      display: flex;
+      gap: 6px;
+    }
+
+    .peer-nickname-input {
+      flex: 1;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #ffffff;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+    }
+
+    .peer-nickname-input:focus {
+      border-color: #ffffff;
+    }
+
+    .peer-nickname-btn {
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .peer-nickname-btn:hover {
+      background: #e5e5e5;
     }
 
     .ide-presence-pill .presence-pulse {
@@ -1034,9 +1199,71 @@
       color: #ffffff;
     }
 
-    @media (max-width: 768px) {
-      .ide-room-pill { padding: 3px 7px; font-size: 10.5px; }
-      .ide-status-bar .status-right { display: none; }
+    /* RESPONSIVE MOBILE OVERRIDES */
+    @media (max-width: 640px) {
+      .ide-top-bar {
+        padding: 0 8px;
+        gap: 4px;
+      }
+      .ide-top-left {
+        gap: 6px;
+      }
+      .ide-brand-name {
+        display: none !important;
+      }
+      .ide-room-pill {
+        padding: 3px 6px;
+        font-size: 11px;
+        max-width: 85px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ide-save-pill #save-status-text {
+        display: none !important;
+      }
+      .ide-save-pill {
+        padding: 4px 6px;
+      }
+      .ide-presence-pill {
+        padding: 3px 6px;
+        font-size: 10px;
+      }
+      .ide-top-right {
+        gap: 4px;
+      }
+      .ide-action-btn {
+        padding: 4px 8px;
+        min-width: 30px;
+        font-size: 11px;
+      }
+      .ide-action-btn span {
+        display: none !important;
+      }
+      .ide-btn-icon {
+        width: 30px;
+        height: 30px;
+      }
+      .peers-dropdown-menu {
+        width: 240px;
+        left: auto;
+        right: -30px;
+        transform: none;
+      }
+      .ide-status-bar {
+        padding: 0 8px;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      #code-stats,
+      #code-chars-count,
+      .ide-status-bar .status-left .stat-sep:nth-of-type(2),
+      .ide-status-bar .status-left .stat-sep:nth-of-type(3) {
+        display: none !important;
+      }
+      .ide-status-bar .status-right {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -1191,15 +1418,33 @@
         </div>
 
         <div class="ide-top-center">
-          <div class="ide-presence-pill" id="online-users-badge">
+          <div class="ide-presence-pill" id="online-users-badge" title="View active collaborators" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-label="Online collaborators list">
             <span class="presence-pulse"></span>
             <span id="online-users-count">1 online</span>
+            <span class="presence-arrow">▾</span>
+          </div>
+
+          <!-- Collaborators Popover Dropdown -->
+          <div id="peers-dropdown" class="peers-dropdown-menu hidden" role="region" aria-label="Collaborators in this room">
+            <div class="peers-dropdown-header">
+              <span>COLLABORATORS (<span id="peers-count-num">1</span>)</span>
+              <button id="btn-close-peers-dropdown" class="peers-close-btn" aria-label="Close collaborators">✕</button>
+            </div>
+            <div class="peers-dropdown-body" id="peers-dropdown-list">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="peers-dropdown-footer">
+              <div class="peer-name-edit-box">
+                <input type="text" id="input-my-nickname" class="peer-nickname-input" placeholder="Set your nickname" maxlength="18" aria-label="Set your collaborator nickname">
+                <button id="btn-save-nickname" class="peer-nickname-btn">Save</button>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="ide-top-right">
           <!-- Copy Code Button (placed next to Share) -->
-          <button id="btn-quick-copy" class="ide-action-btn" title="Copy entire code to clipboard">
+          <button id="btn-quick-copy" class="ide-action-btn" title="Copy entire code to clipboard" aria-label="Copy entire code to clipboard">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -1208,7 +1453,7 @@
           </button>
 
           <!-- Share Room Button -->
-          <button id="btn-share-room" class="ide-action-btn ide-action-primary" title="Share room URL">
+          <button id="btn-share-room" class="ide-action-btn ide-action-primary" title="Share room URL" aria-label="Share room URL">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="18" cy="5" r="3"/>
               <circle cx="6" cy="12" r="3"/>
@@ -1220,12 +1465,12 @@
           </button>
 
           <!-- New Room Button -->
-          <button id="btn-create-new-room" class="ide-action-btn" title="Create clean room">
+          <button id="btn-create-new-room" class="ide-action-btn" title="Create clean room" aria-label="Create clean room">
             <span>+</span><span>New</span>
           </button>
 
           <!-- Export Button -->
-          <button id="btn-download-code" class="ide-action-btn" title="Export file">
+          <button id="btn-download-code" class="ide-action-btn" title="Export file" aria-label="Export file">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -1235,7 +1480,7 @@
           </button>
 
           <!-- Settings Button -->
-          <button id="btn-open-settings" class="ide-btn-icon" title="Editor Preferences">
+          <button id="btn-open-settings" class="ide-btn-icon" title="Editor Preferences" aria-label="Editor Preferences">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1407,7 +1652,7 @@
     <option value="javascript">JavaScript</option>
   </select>
 
-  <script defer src="app.js?v=2.4"></script>
+  <script defer src="app.js?v=2.5"></script>
 </body>
 
 </html>
