@@ -285,9 +285,9 @@
       height: 10px;
       border-radius: 50%;
     }
-    .code-dot.r { background: #444444; }
-    .code-dot.y { background: #777777; }
-    .code-dot.g { background: #bbbbbb; }
+    .code-dot.r { background: #ff5f57; box-shadow: 0 0 6px rgba(255, 95, 87, 0.4); }
+    .code-dot.y { background: #ffbd2e; box-shadow: 0 0 6px rgba(255, 189, 46, 0.4); }
+    .code-dot.g { background: #28c840; box-shadow: 0 0 6px rgba(40, 200, 64, 0.4); }
 
     .code-line {
       font-family: 'JetBrains Mono', monospace;
@@ -338,47 +338,65 @@
       }
     }
 
-    /* Room input form */
+    /* Room input form - Unified, centered, beautifully aligned */
     .room-form {
       display: flex;
       align-items: center;
-      gap: 8px;
-      max-width: 440px;
+      justify-content: center;
+      gap: 10px;
+      max-width: 480px;
       width: 100%;
       margin-bottom: 14px;
+    }
+
+    .room-input-box {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      background: #0d0d0d;
+      border: 1.5px solid #282828;
+      border-radius: 9px;
+      padding: 0 14px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(12px);
+    }
+
+    .room-input-box:focus-within {
+      border-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 0 20px rgba(255, 255, 255, 0.12);
+      background: #141414;
     }
 
     .room-prefix {
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
       font-weight: 600;
-      color: #888888;
+      color: #777777;
       white-space: nowrap;
+      user-select: none;
+      padding-right: 4px;
       flex-shrink: 0;
     }
 
     .room-input {
       flex: 1;
-      background: #080808;
-      border: 1.5px solid #2a2a2a;
-      border-radius: 8px;
-      padding: 11px 16px;
+      min-width: 0;
+      background: transparent;
+      border: none;
+      padding: 12px 6px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 13.5px;
       color: #ffffff;
       outline: none;
-      transition: all 0.2s ease;
-      backdrop-filter: blur(10px);
     }
 
     .room-input::placeholder {
-      color: #555555;
+      color: #4a4a4a;
     }
 
     .room-input:focus {
-      border-color: #ffffff;
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 0 20px rgba(255, 255, 255, 0.15);
-      background: #111111;
+      outline: none;
     }
 
     .room-go-btn {
@@ -469,18 +487,23 @@
       .room-form {
         flex-direction: column;
         align-items: stretch;
+        gap: 10px;
+      }
+
+      .room-input-box {
+        width: 100%;
+        padding: 0 12px;
       }
 
       .room-prefix {
-        display: none;
+        font-size: 12px;
       }
 
       .room-input {
         width: 100%;
-        font-size: 16px;
+        font-size: 15px;
         /* Prevents auto-zoom on iOS Safari */
-        padding: 12px 14px;
-        text-align: center;
+        padding: 12px 6px;
       }
 
       .room-go-btn {
@@ -726,12 +749,10 @@
 
     <nav class="landing-nav">
       <a class="landing-brand" href="javascript:void(0)" id="landing-brand-link">
-        <svg viewBox="0 0 36 36" width="26" height="26" fill="none">
-          <path d="M10 9L4 18L10 27" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"
-            stroke-linejoin="round" />
-          <path d="M26 9L32 18L26 27" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"
-            stroke-linejoin="round" />
-          <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#ffffff" />
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+          <rect x="2" y="2" width="20" height="20" rx="5" fill="#ffffff"/>
+          <path d="M7 8L11 12L7 16" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="13" y1="16" x2="17" y2="16" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>
         </svg>
         <span class="landing-brand-text">Code<span class="landing-brand-shift">Shift</span></span>
       </a>
@@ -765,9 +786,11 @@
 
       <!-- Room input - Primary CTA front and center -->
       <div class="room-form">
-        <span class="room-prefix" id="room-prefix-label">codeshift/#/</span>
-        <input id="landing-room-input" class="room-input" type="text" placeholder="your-room-name" maxlength="64"
-          autocomplete="off" spellcheck="false">
+        <div class="room-input-box">
+          <span class="room-prefix" id="room-prefix-label">codeshift /</span>
+          <input id="landing-room-input" class="room-input" type="text" placeholder="your-room-name" maxlength="64"
+            autocomplete="off" spellcheck="false">
+        </div>
         <button id="landing-open-btn" class="room-go-btn">Open →</button>
       </div>
       <p class="room-hint">or <span id="landing-random-btn">open a random room instantly</span></p>
@@ -779,7 +802,7 @@
           <div class="code-dot y"></div>
           <div class="code-dot g"></div>
         </div>
-        <div class="code-line"><span class="t-cmt" id="code-card-comment">// codeshift/#/your-room · synced in real-time</span></div>
+        <div class="code-line"><span class="t-cmt" id="code-card-comment">// codeshift/your-room · synced in real-time</span></div>
         <div class="code-line"><span class="t-kw">async function</span> <span class="t-fn">collaborate</span><span class="t-p">(</span><span class="t-fn">roomId</span><span class="t-p">) {</span></div>
         <div class="code-line">  <span class="t-kw">const</span> session <span class="t-p">=</span> <span class="t-kw">await</span> CodeShift<span class="t-p">.</span><span class="t-fn">join</span><span class="t-p">(</span>roomId<span class="t-p">);</span></div>
         <div class="code-line">  session<span class="t-p">.</span><span class="t-fn">onCode</span><span class="t-p">(</span>code <span class="t-p">=&gt;</span> <span class="t-fn">sync</span><span class="t-p">(</span>code<span class="t-p">));</span></div>
@@ -792,10 +815,10 @@
       <div class="footer-container">
         <div class="footer-col-brand">
           <div class="footer-brand-header">
-            <svg viewBox="0 0 36 36" width="20" height="20" fill="none">
-              <path d="M10 9L4 18L10 27" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M26 9L32 18L26 27" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M18 7L12 16H16V28H20V16H24L18 7Z" fill="#ffffff" />
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+              <rect x="2" y="2" width="20" height="20" rx="4.5" fill="#ffffff"/>
+              <path d="M7 8L11 12L7 16" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="13" y1="16" x2="17" y2="16" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
             <span class="footer-brand-title">Code<span class="footer-brand-shift">Shift</span></span>
             <span class="footer-tag-pill">v2.0 · Open Source</span>
@@ -804,7 +827,7 @@
         </div>
 
         <div class="footer-col-dev">
-          <div class="footer-dev-line">Developed & maintained with 🤍 by <strong>Kaushal</strong></div>
+          <div class="footer-dev-line">Developed & maintained with ❤️ by <strong>Kaushal</strong></div>
           <div class="footer-dev-sub">Free and open source for developers worldwide under the MIT License.</div>
         </div>
 
@@ -840,12 +863,10 @@
       <header class="editor-header">
         <div class="header-left">
           <a href="javascript:void(0)" class="brand-logo" id="brand-logo" title="Home">
-            <svg class="brand-logo-icon" viewBox="0 0 36 36" width="22" height="22" fill="none">
-              <path d="M10 9L4 18L10 27" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"
-                stroke-linejoin="round" />
-              <path d="M26 9L32 18L26 27" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"
-                stroke-linejoin="round" />
-              <path d="M18 8L12 16H16V28H20V16H24L18 8Z" fill="#ffffff" />
+            <svg class="brand-logo-icon" viewBox="0 0 24 24" width="22" height="22" fill="none">
+              <rect x="2" y="2" width="20" height="20" rx="5" fill="#ffffff"/>
+              <path d="M7 8L11 12L7 16" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="13" y1="16" x2="17" y2="16" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
             <span class="brand-text">Code<span class="brand-shift">Shift</span></span>
           </a>

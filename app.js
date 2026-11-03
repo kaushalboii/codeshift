@@ -1161,14 +1161,12 @@
   });
   if (btnDonePrivacy)  btnDonePrivacy.addEventListener('click', () => closeModal(el.modalPrivacy));
 
-  // Dynamic URL prefix in landing page room input and code preview card
+  // URL prefix in landing page room input and code preview card
   function updateUrlPrefix() {
     try {
-      const host = window.location.host;
-      const path = window.location.pathname.replace(/\/+$/, '');
-      const prefix = host ? `${host}${path}/#/` : 'codeshift/#/';
+      const prefix = 'codeshift /';
       if (el.roomPrefixLabel) el.roomPrefixLabel.textContent = prefix;
-      if (el.codeCardComment) el.codeCardComment.textContent = `// ${prefix}your-room · synced in real-time`;
+      if (el.codeCardComment) el.codeCardComment.textContent = '// codeshift/your-room · synced in real-time';
     } catch (_) {}
   }
 

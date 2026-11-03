@@ -1,28 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
-  <defs>
-    <linearGradient id="favBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1F1B3B"/>
-      <stop offset="100%" stop-color="#0E0F16"/>
-    </linearGradient>
-    <linearGradient id="favGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6366F1"/>
-      <stop offset="50%" stop-color="#8B7CFF"/>
-      <stop offset="100%" stop-color="#38BDF8"/>
-    </linearGradient>
-    <linearGradient id="favShift" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#C084FC"/>
-      <stop offset="100%" stop-color="#8B7CFF"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="url(#favBg)"/>
-  <rect x="1" y="1" width="62" height="62" rx="15" fill="none" stroke="#333752" stroke-width="1.5"/>
-  <g>
-    <!-- Left bracket < -->
-    <path d="M22 20L12 32L22 44" stroke="url(#favGrad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Right bracket > -->
-    <path d="M42 20L52 32L42 44" stroke="url(#favGrad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Shift arrow ⇧ -->
-    <path d="M32 17L25 26H29V41C29 42 29.8 43 31 43H33C34.2 43 35 42 35 41V26H39L32 17Z" fill="url(#favShift)"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect x="2" y="2" width="28" height="28" rx="7" fill="#ffffff"/>
+  <path d="M9 10L16 16L9 22" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="18" y1="22" x2="24" y2="22" stroke="#000000" stroke-width="3" stroke-linecap="round"/>
 </svg>
-
