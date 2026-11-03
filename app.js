@@ -279,6 +279,9 @@
     if (landingPage) landingPage.classList.add('hidden');
     if (editorPage)  editorPage.classList.remove('hidden');
     stopCanvasAnimation();
+    setTimeout(() => {
+      if (state.monacoInstance) state.monacoInstance.layout();
+    }, 60);
   }
 
   // ──────────────────────────────────────────────
