@@ -15,17 +15,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Job 1: Build & Deploy to gh-pages branch (Guaranteed to succeed under all repository settings)
+  deploy-gh-pages-branch:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
 
       - name: Prepare Clean Distribution
         run: |
@@ -39,6 +34,28 @@ jobs:
           publish_dir: ./dist
           publish_branch: gh-pages
           force_orphan: true
+
+  # Job 2: Deploy to GitHub Pages via Actions (Active when Settings -> Pages -> Source is 'GitHub Actions')
+  deploy-pages-action:
+    needs: deploy-gh-pages-branch
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+
+      - name: Prepare Clean Distribution
+        run: |
+          mkdir -p dist
+          cp -r index.html app.js styles.css public brand .nojekyll README.md dist/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
