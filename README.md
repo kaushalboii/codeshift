@@ -14,7 +14,7 @@
 
 👉 **Try it Live**: [https://kaushalboii.github.io/codeshift/](https://kaushalboii.github.io/codeshift/)
 
-![CodeShift Preview & Real-Time Sync Simulation](./public/preview.svg)
+[![CodeShift Preview & Real-Time Sync Simulation](./public/preview.svg)](https://kaushalboii.github.io/codeshift/)
 
 ---
 
