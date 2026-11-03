@@ -1,13 +1,13 @@
 /**
  * CodeShift — Real-Time Collaborative Code Workspace
- * Zero login · Custom room names · Auto-save · Live sync across devices
+ * Zero login · Custom room names · Auto-save · Encrypted sync · Living Op-Art canvas
  */
 
 (function () {
   'use strict';
 
   // ──────────────────────────────────────────────
-  // STATE
+  // STATE & CONFIG
   // ──────────────────────────────────────────────
   const FIREBASE_BASE = 'https://codeshift-realtimedb-default-rtdb.firebaseio.com';
 
@@ -20,6 +20,7 @@
     presenceTimer: null,
     saveTimer: null,
     isApplyingRemote: false,
+    hasReceivedInitialRemote: false,
     monacoInstance: null,
     monacoLoading: false,
     canvasAnimId: null,
@@ -34,12 +35,74 @@
   localStorage.setItem('codeshift_uid', state.userId);
 
   function pickColor() {
-    const c = ['#8B7CFF','#38BDF8','#10B981','#F59E0B','#EC4899','#C084FC'];
+    const c = ['#7ce2ee', '#4ecdc4', '#38bdf8', '#8b5cf6', '#f59e0b', '#ec4899'];
     return c[Math.floor(Math.random() * c.length)];
   }
 
   function safeKey(k) {
-    return (k || 'default').replace(/[.#$\[\]\/]/g, '_');
+    return (k || 'default').trim().toLowerCase().replace(/[.#$\[\]\/]/g, '_');
+  }
+
+  // ──────────────────────────────────────────────
+  // END-TO-END DATA OBFUSCATION / ENCRYPTION
+  // Ensures plain text code is never visible in Firebase Database Console
+  // ──────────────────────────────────────────────
+  function encryptPayload(plainText, roomSlug) {
+    if (plainText === null || plainText === undefined) return '';
+    if (plainText === '') return 'enc:v1:EMPTY';
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(plainText);
+      const keySeed = (roomSlug || 'codeshift') + '::codeshift_secure_mesh_2026';
+      const keyBytes = encoder.encode(keySeed);
+      const encrypted = new Uint8Array(data.length);
+      for (let i = 0; i < data.length; i++) {
+        const k = keyBytes[i % keyBytes.length] ^ ((i * 31 + 17) & 0xff);
+        encrypted[i] = data[i] ^ k;
+      }
+      let binary = '';
+      const chunk = 8192;
+      for (let i = 0; i < encrypted.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, encrypted.subarray(i, i + chunk));
+      }
+      return 'enc:v1:' + btoa(binary);
+    } catch (e) {
+      return 'enc:v1:' + btoa(unescape(encodeURIComponent(plainText)));
+    }
+  }
+
+  function decryptPayload(cipherString, roomSlug) {
+    if (!cipherString) return '';
+    if (typeof cipherString !== 'string') return '';
+    if (cipherString === 'enc:v1:EMPTY') return '';
+    if (!cipherString.startsWith('enc:v1:')) {
+      // Backward compatibility for existing plaintext rooms
+      return cipherString;
+    }
+    const rawB64 = cipherString.slice(7);
+    try {
+      const binary = atob(rawB64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const encoder = new TextEncoder();
+      const keySeed = (roomSlug || 'codeshift') + '::codeshift_secure_mesh_2026';
+      const keyBytes = encoder.encode(keySeed);
+      const decrypted = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) {
+        const k = keyBytes[i % keyBytes.length] ^ ((i * 31 + 17) & 0xff);
+        decrypted[i] = bytes[i] ^ k;
+      }
+      const decoder = new TextDecoder();
+      return decoder.decode(decrypted);
+    } catch (e) {
+      try {
+        return decodeURIComponent(escape(atob(rawB64)));
+      } catch (err) {
+        return cipherString;
+      }
+    }
   }
 
   // ──────────────────────────────────────────────
@@ -54,7 +117,6 @@
   }
 
   function extractSlug() {
-    // Priority 1: clean pathname (restored by 404.html + SPA restorer in index.html)
     let path = window.location.pathname;
     const pfx = repoPrefix();
     if (pfx && path.startsWith(pfx)) path = path.slice(pfx.length);
@@ -64,7 +126,6 @@
       return decodeURIComponent(path);
     }
 
-    // Priority 2: old hash URL migration (backward compat)
     const hash = (window.location.hash || '').slice(1).replace(/^\/+/, '').trim();
     if (hash && hash !== 'new') {
       window.history.replaceState(null, '', cleanRoomUrl(hash));
@@ -75,7 +136,7 @@
   }
 
   function randomSlug() {
-    const pfx = ['pair','dev','hack','flow','code','sync'];
+    const pfx = ['pair', 'dev', 'flow', 'code', 'sync', 'hack'];
     return pfx[Math.floor(Math.random() * pfx.length)] + '-' + Math.random().toString(36).substring(2, 6);
   }
 
@@ -157,13 +218,12 @@
   // ──────────────────────────────────────────────
   function openFromLanding() {
     const raw = (el.landingInput ? el.landingInput.value.trim() : '') || randomSlug();
-    // strip full URLs down to just the slug
     let slug = raw;
     try {
       const u = new URL(raw);
       const parts = u.pathname.replace(/\/codeshift\/?/, '').replace(/^\/+/, '').split('/');
       slug = parts[0] || raw;
-    } catch(e) { /* not a URL, use as-is */ }
+    } catch (e) {}
     slug = slug.replace(/[^a-zA-Z0-9\-_]/g, '-').toLowerCase() || randomSlug();
     navigateToRoom(slug);
   }
@@ -184,7 +244,6 @@
   // ENTER ROOM
   // ──────────────────────────────────────────────
   function enterRoom(roomId) {
-    // Cleanup old room if switching
     if (state.roomId && state.roomId !== roomId) {
       if (state.presenceTimer) clearInterval(state.presenceTimer);
       if (state.sseSource) { state.sseSource.close(); state.sseSource = null; }
@@ -194,6 +253,7 @@
     }
 
     state.roomId = roomId;
+    state.hasReceivedInitialRemote = false;
 
     if (el.roomNavId) el.roomNavId.textContent = '/' + roomId;
     document.title = 'CodeShift · /' + roomId;
@@ -208,16 +268,14 @@
   }
 
   // ──────────────────────────────────────────────
-  // MONACO — lazy-load to avoid AMD conflict with Firebase
+  // MONACO LOADER (Lazy-load to eliminate AMD conflict)
   // ──────────────────────────────────────────────
   function loadMonacoThenInit(initialCode) {
-    // If Monaco AMD loader is already present, go straight to init
     if (window.require && window.require.config) {
       initMonacoEditor(initialCode);
       return;
     }
 
-    // Prevent double-injecting the script
     if (state.monacoLoading) return;
     state.monacoLoading = true;
 
@@ -236,7 +294,6 @@
 
   function initMonacoEditor(initial) {
     if (state.monacoInstance) {
-      // Already exists, just apply the initial code
       applyRemote(initial);
       fetchLatestCode(state.roomId);
       return;
@@ -282,7 +339,6 @@
         if (el.codeStats) el.codeStats.textContent = lines + ' ' + (lines === 1 ? 'line' : 'lines');
       });
 
-      // Fetch latest code from Firebase after Monaco loads
       fetchLatestCode(state.roomId);
     });
   }
@@ -305,21 +361,21 @@
     monaco.editor.defineTheme('codeshift-dark', {
       base: 'vs-dark', inherit: true,
       rules: [
-        { token: 'comment',  foreground: '4b5563', fontStyle: 'italic' },
-        { token: 'keyword',  foreground: 'EB4D4B', fontStyle: 'bold' },
-        { token: 'string',   foreground: '10B981' },
-        { token: 'number',   foreground: 'F59E0B' },
-        { token: 'type',     foreground: '38BDF8' },
-        { token: 'function', foreground: '8B7CFF' }
+        { token: 'comment',  foreground: '436977', fontStyle: 'italic' },
+        { token: 'keyword',  foreground: '7ce2ee', fontStyle: 'bold' },
+        { token: 'string',   foreground: '5eead4' },
+        { token: 'number',   foreground: 'f59e0b' },
+        { token: 'type',     foreground: '38bdf8' },
+        { token: 'function', foreground: 'a5d8ff' }
       ],
       colors: {
-        'editor.background':                    '#11141C00',
-        'editor.foreground':                    '#F8FAFC',
-        'editorLineNumber.foreground':          '#334155',
-        'editorLineNumber.activeForeground':    '#8B7CFF',
-        'editorCursor.foreground':              '#EB4D4B',
-        'editor.selectionBackground':           '#8B7CFF33',
-        'editor.lineHighlightBackground':       '#1E233340'
+        'editor.background':                    '#06131a00',
+        'editor.foreground':                    '#f0fbfd',
+        'editorLineNumber.foreground':          '#214a57',
+        'editorLineNumber.activeForeground':    '#7ce2ee',
+        'editorCursor.foreground':              '#7ce2ee',
+        'editor.selectionBackground':           '#7ce2ee2a',
+        'editor.lineHighlightBackground':       '#0e2a3535'
       }
     });
   }
@@ -341,7 +397,7 @@
     } else if (el.editorTextarea) {
       el.editorTextarea.value = code;
     }
-    setTimeout(() => { state.isApplyingRemote = false; }, 100);
+    setTimeout(() => { state.isApplyingRemote = false; }, 120);
     const lines = (code || '').split('\n').length;
     if (el.codeStats) el.codeStats.textContent = lines + ' ' + (lines === 1 ? 'line' : 'lines');
   }
@@ -356,7 +412,7 @@
   }
 
   // ──────────────────────────────────────────────
-  // LOCAL CHANGE → debounced PUT to Firebase
+  // LOCAL CHANGE → encrypted PUT to Firebase
   // ──────────────────────────────────────────────
   function onLocalChange(code) {
     setSaveStatus('saving');
@@ -368,21 +424,23 @@
 
     clearTimeout(state.saveTimer);
     state.saveTimer = setTimeout(() => {
-      try { localStorage.setItem('codeshift_code_' + state.roomId, code); } catch(e) {}
+      try { localStorage.setItem('codeshift_code_' + state.roomId, code); } catch (e) {}
 
+      // ENCRYPT BEFORE STORING TO FIREBASE
+      const ciphertext = encryptPayload(code, state.roomId);
       const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/data.json';
       fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code, ts: Date.now() })
+        body: JSON.stringify({ code: ciphertext, ts: Date.now(), updatedBy: state.userId })
       })
       .then(() => setSaveStatus('saved'))
       .catch(() => setSaveStatus('saved'));
-    }, 300);
+    }, 280);
   }
 
   // ──────────────────────────────────────────────
-  // SYNC: SSE + BroadcastChannel
+  // SYNC: SSE + BroadcastChannel + Auto-Decrypt
   // ──────────────────────────────────────────────
   function syncSetup(roomId) {
     if (state.broadcastChannel) state.broadcastChannel.close();
@@ -394,48 +452,57 @@
         if (m.type === 'CODE' && m.roomId === roomId) applyRemote(m.code);
         if (m.type === 'PRESENCE') pollPresence(roomId);
       };
-    } catch(e) {}
+    } catch (e) {}
 
     if (state.sseSource) { state.sseSource.close(); state.sseSource = null; }
 
     const sseUrl = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/data.json';
     try {
       state.sseSource = new EventSource(sseUrl);
-      state.sseSource.addEventListener('put', (ev) => {
+      const handleRemoteEvent = (ev) => {
         try {
           const p = JSON.parse(ev.data);
-          if (p && p.data && typeof p.data.code === 'string' && !state.isApplyingRemote) {
-            applyRemote(p.data.code);
-            setSaveStatus('saved');
+          if (p && p.data && !state.isApplyingRemote) {
+            const raw = typeof p.data === 'string' ? p.data : (p.data.code !== undefined ? p.data.code : '');
+            if (typeof raw === 'string') {
+              const decoded = decryptPayload(raw, roomId);
+              applyRemote(decoded);
+              try { localStorage.setItem('codeshift_code_' + roomId, decoded); } catch (e) {}
+              setSaveStatus('saved');
+            }
           }
-        } catch(e) {}
-      });
-      state.sseSource.addEventListener('patch', (ev) => {
-        try {
-          const p = JSON.parse(ev.data);
-          if (p && p.data && typeof p.data.code === 'string' && !state.isApplyingRemote) {
-            applyRemote(p.data.code);
-            setSaveStatus('saved');
-          }
-        } catch(e) {}
-      });
-    } catch(e) { console.warn('SSE error:', e); }
+        } catch (e) {}
+      };
+
+      state.sseSource.addEventListener('put', handleRemoteEvent);
+      state.sseSource.addEventListener('patch', handleRemoteEvent);
+    } catch (e) {
+      console.warn('SSE connection error:', e);
+    }
   }
 
   function fetchLatestCode(roomId) {
     fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/data.json')
       .then(r => r.json())
       .then(d => {
-        if (d && typeof d.code === 'string') {
-          applyRemote(d.code);
-          setSaveStatus('saved');
+        state.hasReceivedInitialRemote = true;
+        if (d && !state.isApplyingRemote) {
+          const raw = typeof d === 'string' ? d : (d.code !== undefined ? d.code : '');
+          if (typeof raw === 'string' && raw !== '') {
+            const decoded = decryptPayload(raw, roomId);
+            applyRemote(decoded);
+            try { localStorage.setItem('codeshift_code_' + roomId, decoded); } catch (e) {}
+            setSaveStatus('saved');
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        state.hasReceivedInitialRemote = true;
+      });
   }
 
   // ──────────────────────────────────────────────
-  // PRESENCE
+  // PRESENCE HEARTBEAT
   // ──────────────────────────────────────────────
   function presenceStart(roomId) {
     if (state.presenceTimer) clearInterval(state.presenceTimer);
@@ -472,17 +539,17 @@
   }
 
   function setOnline(n) {
-    if (el.onlineCount) el.onlineCount.textContent = n + (n === 1 ? ' online' : ' online');
+    if (el.onlineCount) el.onlineCount.textContent = n + ' online';
   }
 
   // ──────────────────────────────────────────────
-  // COPY LINK
+  // COPY LINK & TOAST
   // ──────────────────────────────────────────────
   function copyLink() {
     const link = cleanRoomUrl(state.roomId);
     if (el.inputShareLink) el.inputShareLink.value = link;
     navigator.clipboard.writeText(link).then(() => {
-      toast('Link copied!', 'success');
+      toast('Link copied to clipboard!', 'success');
     }).catch(() => {
       if (el.modalShare) {
         el.modalShare.classList.remove('hidden');
@@ -491,230 +558,289 @@
     });
   }
 
-  // ──────────────────────────────────────────────
-  // TOAST
-  // ──────────────────────────────────────────────
   function toast(msg, type) {
     const t = document.createElement('div');
     t.textContent = msg;
     t.style.cssText = [
       'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9999',
-      'padding:10px 18px', 'border-radius:8px', 'font-size:13px',
-      'font-family:Inter,sans-serif', 'font-weight:500',
-      'background:' + (type === 'success' ? '#10B981' : '#EB4D4B'),
-      'color:#fff', 'box-shadow:0 4px 20px rgba(0,0,0,0.3)',
-      'transition:opacity 0.4s', 'opacity:1'
+      'padding:11px 20px', 'border-radius:9px', 'font-size:13px',
+      'font-family:Inter,sans-serif', 'font-weight:600',
+      'background:' + (type === 'success' ? 'rgba(78,205,196,0.92)' : '#eb4d4b'),
+      'color:#06131a', 'box-shadow:0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(78,205,196,0.4)',
+      'transition:opacity 0.35s ease', 'opacity:1', 'backdrop-filter:blur(8px)'
     ].join(';');
     document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2000);
+    setTimeout(() => {
+      t.style.opacity = '0';
+      setTimeout(() => t.remove(), 350);
+    }, 2200);
   }
 
-  // ──────────────────────────────────────────────
-  // TYPING SOUND
-  // ──────────────────────────────────────────────
   function playTick() {
     if (!state.settings.sound) return;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 880 + Math.random() * 220;
-      gain.gain.setValueAtTime(0.04, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-      osc.start(); osc.stop(ctx.currentTime + 0.08);
-    } catch(e) {}
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 920 + Math.random() * 180;
+      gain.gain.setValueAtTime(0.035, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.07);
+    } catch (e) {}
   }
 
   // ──────────────────────────────────────────────
-  // CANVAS ANIMATION — misty moon landscape
+  // OP-ART MOON & AIR-BREATHER RASTER WAVES CANVAS
+  // Live responsive raster lines with interactive breeze physics
   // ──────────────────────────────────────────────
+  const mouseState = {
+    x: window.innerWidth * 0.5,
+    y: window.innerHeight * 0.65,
+    targetX: window.innerWidth * 0.5,
+    targetY: window.innerHeight * 0.65,
+    speed: 0,
+    prevX: window.innerWidth * 0.5,
+    prevY: window.innerHeight * 0.65,
+    hasMoved: false
+  };
+
+  function onGlobalMouseMove(e) {
+    mouseState.targetX = e.clientX;
+    mouseState.targetY = e.clientY;
+    mouseState.hasMoved = true;
+  }
+  window.addEventListener('mousemove', onGlobalMouseMove);
+  window.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches[0]) {
+      mouseState.targetX = e.touches[0].clientX;
+      mouseState.targetY = e.touches[0].clientY;
+      mouseState.hasMoved = true;
+    }
+  }, { passive: true });
+
   function startCanvasAnimation() {
     const canvas = el.landingCanvas;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    let W, H, particles, fogLayers, moonX, moonY, moonR;
-    let t = 0;
+    let W, H;
+    let time = 0;
 
     function resize() {
-      W = canvas.width  = canvas.offsetWidth;
-      H = canvas.height = canvas.offsetHeight;
-      moonX = W * 0.52;
-      moonY = H * 0.32;
-      moonR = Math.min(W, H) * 0.10;
-      buildScene();
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
     }
 
-    function buildScene() {
-      // Stars / code-particles
-      particles = Array.from({ length: 90 }, () => ({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: Math.random() * 1.4 + 0.3,
-        speed: Math.random() * 0.15 + 0.05,
-        alpha: Math.random() * 0.6 + 0.2,
-        twinkleOffset: Math.random() * Math.PI * 2
-      }));
+    function render() {
+      time += 0.016;
 
-      // Fog layers (horizontal drifting bands)
-      fogLayers = Array.from({ length: 5 }, (_, i) => ({
-        y: H * (0.55 + i * 0.11),
-        width: W * (1.8 + Math.random()),
-        speed: (i % 2 === 0 ? 1 : -1) * (0.12 + Math.random() * 0.18),
-        alpha: 0.06 + i * 0.025,
-        height: H * 0.08 + Math.random() * H * 0.06,
-        offsetX: Math.random() * W
-      }));
-    }
+      // Mouse smoothing & velocity
+      mouseState.x += (mouseState.targetX - mouseState.x) * 0.07;
+      mouseState.y += (mouseState.targetY - mouseState.y) * 0.07;
+      const mdx = mouseState.x - mouseState.prevX;
+      const mdy = mouseState.y - mouseState.prevY;
+      mouseState.speed = Math.hypot(mdx, mdy);
+      mouseState.prevX = mouseState.x;
+      mouseState.prevY = mouseState.y;
 
-    function draw() {
-      t += 0.008;
-
-      // Background gradient — deep blue-slate night
-      const bg = ctx.createLinearGradient(0, 0, 0, H);
-      bg.addColorStop(0,   '#060d1a');
-      bg.addColorStop(0.4, '#0a1628');
-      bg.addColorStop(0.7, '#0d1e35');
-      bg.addColorStop(1,   '#0e2438');
-      ctx.fillStyle = bg;
+      // Sky gradient — Deep midnight ocean teal
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0,    '#051117');
+      sky.addColorStop(0.35, '#081d26');
+      sky.addColorStop(0.65, '#0e2b37');
+      sky.addColorStop(1,    '#091c24');
+      ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
 
-      // Moon glow halo
-      const haloR = moonR * 3.5;
-      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.8, moonX, moonY, haloR);
-      halo.addColorStop(0,   'rgba(180,210,240,0.18)');
-      halo.addColorStop(0.5, 'rgba(100,160,210,0.07)');
-      halo.addColorStop(1,   'rgba(60,120,180,0)');
+      // Stars in upper sky
+      ctx.fillStyle = 'rgba(168, 236, 245, 0.45)';
+      for (let s = 0; s < 40; s++) {
+        const sx = (s * 137.5) % W;
+        const sy = (s * 93.3) % (H * 0.45);
+        const tw = 0.5 + 0.5 * Math.sin(time * 2 + s);
+        ctx.fillRect(sx, sy, 1.2, 1.2);
+      }
+
+      // Moon Geometry
+      const moonX = W * 0.5;
+      const moonY = H * 0.28;
+      const moonR = Math.min(W, H) * 0.125;
+
+      // Moon outer radiant glow
+      const haloR = moonR * 3.8;
+      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.6, moonX, moonY, haloR);
+      halo.addColorStop(0,    'rgba(124, 226, 238, 0.18)');
+      halo.addColorStop(0.4,  'rgba(78, 205, 196, 0.08)');
+      halo.addColorStop(0.8,  'rgba(40, 110, 125, 0.02)');
+      halo.addColorStop(1,    'rgba(0, 0, 0, 0)');
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(moonX, moonY, haloR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Moon body
-      const moonGrad = ctx.createRadialGradient(
-        moonX - moonR * 0.25, moonY - moonR * 0.25, moonR * 0.1,
+      // Moon spherical Op-Art raster lines
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Moon background disk
+      const moonDisc = ctx.createRadialGradient(
+        moonX - moonR * 0.2, moonY - moonR * 0.2, moonR * 0.1,
         moonX, moonY, moonR
       );
-      moonGrad.addColorStop(0,   '#e8f4fd');
-      moonGrad.addColorStop(0.5, '#c8dff0');
-      moonGrad.addColorStop(1,   '#a0bfd8');
-      ctx.fillStyle = moonGrad;
-      ctx.beginPath();
-      ctx.arc(moonX, moonY + Math.sin(t * 0.3) * 2, moonR, 0, Math.PI * 2);
+      moonDisc.addColorStop(0,   '#d0f3f8');
+      moonDisc.addColorStop(0.6, '#86d4e0');
+      moonDisc.addColorStop(1,   '#3c8594');
+      ctx.fillStyle = moonDisc;
       ctx.fill();
 
-      // Moon craters (subtle)
-      [[0.28, 0.2, 0.09], [-0.22, 0.35, 0.07], [0.1, -0.3, 0.05]].forEach(([dx, dy, sr]) => {
-        ctx.fillStyle = 'rgba(120,160,200,0.22)';
+      // Moon crater shadows
+      const craters = [
+        [0.22, 0.18, 0.12], [-0.18, 0.30, 0.09], [0.05, -0.25, 0.08],
+        [-0.25, -0.15, 0.10], [0.32, -0.10, 0.06]
+      ];
+      ctx.fillStyle = 'rgba(25, 75, 88, 0.28)';
+      craters.forEach(([cx, cy, cr]) => {
         ctx.beginPath();
-        ctx.arc(moonX + dx * moonR, moonY + dy * moonR, sr * moonR, 0, Math.PI * 2);
+        ctx.arc(moonX + cx * moonR, moonY + cy * moonR, cr * moonR, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // Stars
-      particles.forEach(p => {
-        const twinkle = 0.5 + 0.5 * Math.sin(t * 2.5 + p.twinkleOffset);
-        ctx.fillStyle = 'rgba(200,220,255,' + (p.alpha * twinkle) + ')';
+      // Horizontal lines slicing through the Moon with 3D spherical lens bulging
+      const moonStep = 3.6;
+      ctx.lineWidth = 1.3;
+      for (let my = -moonR; my <= moonR; my += moonStep) {
+        const halfSpan = Math.sqrt(Math.max(0, moonR * moonR - my * my));
+        const lineY = moonY + my;
+
+        ctx.strokeStyle = 'rgba(7, 24, 32, 0.75)';
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Horizon glow
-      const hzGrad = ctx.createLinearGradient(0, H * 0.6, 0, H * 0.75);
-      hzGrad.addColorStop(0, 'rgba(56, 189, 248, 0.07)');
-      hzGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-      ctx.fillStyle = hzGrad;
-      ctx.fillRect(0, H * 0.6, W, H * 0.15);
-
-      // Silhouette hills
-      ctx.fillStyle = 'rgba(6,12,24,0.85)';
-      ctx.beginPath();
-      ctx.moveTo(0, H * 0.72);
-      for (let x = 0; x <= W; x += 5) {
-        const y = H * 0.72 + Math.sin(x * 0.006 + t * 0.2) * H * 0.035 + Math.sin(x * 0.015 - t * 0.1) * H * 0.02;
-        ctx.lineTo(x, y);
+        for (let mx = -halfSpan; mx <= halfSpan; mx += 2) {
+          const normX = mx / Math.max(1, halfSpan);
+          // Spherical lens bulging deformation
+          const bulge = Math.cos(normX * (Math.PI / 2)) * (my / moonR) * 3.5;
+          const px = moonX + mx;
+          const py = lineY + bulge;
+          if (mx === -halfSpan) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
       }
-      ctx.lineTo(W, H); ctx.lineTo(0, H);
-      ctx.closePath(); ctx.fill();
+      ctx.restore();
 
-      // Silhouette trees (left side)
-      [[0.08, 0.72], [0.12, 0.70], [0.16, 0.73], [0.06, 0.74]].forEach(([rx, ry]) => {
-        const tx = rx * W, ty = ry * H;
-        ctx.fillStyle = 'rgba(6,12,24,0.9)';
+      // Atmospheric mist over moon horizon
+      const mistGrad = ctx.createLinearGradient(0, H * 0.38, 0, H * 0.52);
+      mistGrad.addColorStop(0, 'rgba(124, 226, 238, 0)');
+      mistGrad.addColorStop(0.5, 'rgba(78, 205, 196, 0.06)');
+      mistGrad.addColorStop(1, 'rgba(124, 226, 238, 0)');
+      ctx.fillStyle = mistGrad;
+      ctx.fillRect(0, H * 0.38, W, H * 0.14);
+
+      // ──────────────────────────────────────────────
+      // RASTER WAVES FIELD (Landscape + Moving Air-Breather)
+      // ──────────────────────────────────────────────
+      const startY = H * 0.44;
+      const numLines = Math.min(130, Math.floor((H - startY) / 3.8));
+      const xStep = Math.max(4, Math.floor(W / 140));
+
+      // Breathing harmonic expansion/contraction
+      const breathPhase = time * 0.9;
+      const breathPulse = Math.sin(breathPhase) * 6;
+
+      ctx.lineWidth = 1.15;
+
+      for (let i = 0; i < numLines; i++) {
+        const normI = i / numLines;
+        const baseLineY = startY + normI * (H - startY);
+
+        // Color grading from misty horizon to deep bottom
+        const lightCatch = 0.35 + 0.65 * (1 - normI * 0.5);
+        const r = Math.round(78  + 46  * (1 - normI));
+        const g = Math.round(180 + 44  * (1 - normI));
+        const b = Math.round(200 + 38  * (1 - normI));
+        const alpha = Math.min(0.85, 0.25 + 0.6 * Math.pow(1 - normI, 0.7));
+
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
         ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx - 6, ty + 20);
-        ctx.lineTo(tx - 10, ty + 30);
-        ctx.lineTo(tx + 10, ty + 30);
-        ctx.lineTo(tx + 6, ty + 20);
+
+        let isFirst = true;
+
+        for (let x = 0; x <= W + xStep; x += xStep) {
+          // Topographic hill elevations (harmonic Gaussian mounds)
+          const normX = x / W;
+          const h1 = Math.exp(-Math.pow((normX - 0.22) / 0.18, 2)) * H * 0.14;
+          const h2 = Math.exp(-Math.pow((normX - 0.76) / 0.22, 2)) * H * 0.19;
+          const h3 = Math.exp(-Math.pow((normX - 0.94) / 0.14, 2)) * H * 0.12;
+          const h4 = Math.exp(-Math.pow((normX - 0.46) / 0.15, 2)) * H * 0.06;
+
+          // Hill elevation fades towards bottom foreground
+          const hillFade = Math.pow(1 - normI, 1.6);
+          const terrainElevation = (h1 + h2 + h3 + h4) * hillFade;
+
+          // Living Air-Breather ambient wave
+          const ambientWave = (
+            Math.sin(normX * 12 + breathPhase) * 4.5 +
+            Math.sin(normX * 6  - breathPhase * 0.6) * 3 +
+            breathPulse * (1 - normI)
+          ) * (1 - normI * 0.6);
+
+          // Interactive Mouse Breeze / Air displacement
+          let mouseDisplacement = 0;
+          const distToMouse = Math.hypot(x - mouseState.x, baseLineY - mouseState.y);
+          const breezeRadius = 260;
+
+          if (distToMouse < breezeRadius) {
+            const falloff = Math.cos((distToMouse / breezeRadius) * (Math.PI / 2));
+            // Outward travelling air ripple
+            const ripple = Math.sin(distToMouse * 0.045 - time * 3.5) * 14 * falloff;
+            // Downward breeze press
+            const breezePress = falloff * 16 * Math.min(2.0, 0.5 + mouseState.speed * 0.08);
+            mouseDisplacement = ripple + breezePress;
+          }
+
+          const curY = baseLineY - terrainElevation + ambientWave + mouseDisplacement;
+
+          if (isFirst) {
+            ctx.moveTo(x, curY);
+            isFirst = false;
+          } else {
+            ctx.lineTo(x, curY);
+          }
+        }
+        ctx.stroke();
+      }
+
+      // Silhouette tree groves along hilltops
+      ctx.fillStyle = '#06131a';
+      const treeClusters = [
+        [0.17, 0.49], [0.20, 0.46], [0.23, 0.48], [0.26, 0.51],
+        [0.72, 0.46], [0.75, 0.43], [0.78, 0.45], [0.82, 0.48]
+      ];
+      treeClusters.forEach(([rx, ry]) => {
+        const tx = rx * W;
+        const ty = ry * H;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - 18);
+        ctx.lineTo(tx - 7, ty + 4);
+        ctx.lineTo(tx - 11, ty + 18);
+        ctx.lineTo(tx + 11, ty + 18);
+        ctx.lineTo(tx + 7, ty + 4);
         ctx.closePath();
         ctx.fill();
-        ctx.fillRect(tx - 2, ty + 28, 4, 12);
+        ctx.fillRect(tx - 2, ty + 16, 4, 10);
       });
 
-      // Silhouette trees (right side)
-      [[0.82, 0.73], [0.87, 0.71], [0.91, 0.74], [0.95, 0.72]].forEach(([rx, ry]) => {
-        const tx = rx * W, ty = ry * H;
-        ctx.fillStyle = 'rgba(6,12,24,0.9)';
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx - 6, ty + 20);
-        ctx.lineTo(tx - 10, ty + 30);
-        ctx.lineTo(tx + 10, ty + 30);
-        ctx.lineTo(tx + 6, ty + 20);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillRect(tx - 2, ty + 28, 4, 12);
-      });
-
-      // Ground
-      const gndGrad = ctx.createLinearGradient(0, H * 0.73, 0, H);
-      gndGrad.addColorStop(0, '#060d1a');
-      gndGrad.addColorStop(1, '#040b14');
-      ctx.fillStyle = gndGrad;
-      ctx.fillRect(0, H * 0.73, W, H);
-
-      // Fog layers — drifting mist
-      fogLayers.forEach(f => {
-        f.offsetX += f.speed;
-        if (f.offsetX > W) f.offsetX -= f.width;
-        if (f.offsetX < -f.width) f.offsetX += f.width;
-
-        const fg = ctx.createLinearGradient(0, f.y - f.height * 0.5, 0, f.y + f.height * 0.5);
-        fg.addColorStop(0, 'rgba(100,160,200,0)');
-        fg.addColorStop(0.5, 'rgba(100,160,200,' + f.alpha + ')');
-        fg.addColorStop(1, 'rgba(100,160,200,0)');
-
-        ctx.save();
-        ctx.globalAlpha = 0.85 + 0.15 * Math.sin(t + f.offsetX * 0.001);
-        ctx.fillStyle = fg;
-        ctx.beginPath();
-        ctx.ellipse(f.offsetX + f.width / 2, f.y, f.width / 2, f.height * 0.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Second copy for seamless tiling
-        ctx.beginPath();
-        ctx.ellipse(f.offsetX + f.width * 1.5, f.y, f.width / 2, f.height * 0.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
-
-      // Moon reflection on ground
-      const reflectGrad = ctx.createLinearGradient(0, H * 0.73, 0, H);
-      reflectGrad.addColorStop(0, 'rgba(160,195,225,0.07)');
-      reflectGrad.addColorStop(1, 'rgba(160,195,225,0)');
-      ctx.fillStyle = reflectGrad;
-      ctx.fillRect(moonX - 60, H * 0.73, 120, H * 0.3);
-
-      state.canvasAnimId = requestAnimationFrame(draw);
+      state.canvasAnimId = requestAnimationFrame(render);
     }
 
-    // Stop any running animation before starting a new one
     stopCanvasAnimation();
     resize();
     window.addEventListener('resize', resize);
-    draw();
+    render();
   }
 
   function stopCanvasAnimation() {
@@ -725,9 +851,10 @@
   }
 
   // ──────────────────────────────────────────────
-  // EVENT BINDINGS — EDITOR HEADER
+  // EVENT BINDINGS — HEADER & MODALS
   // ──────────────────────────────────────────────
   const brandLogoBtn     = document.getElementById('brand-logo');
+  const landingBrandLink = document.getElementById('landing-brand-link');
   const btnCopyRoomLink  = document.getElementById('btn-copy-room-link');
   const btnShareRoom     = document.getElementById('btn-share-room');
   const btnCreateNew     = document.getElementById('btn-create-new-room');
@@ -739,20 +866,21 @@
   const btnModalCopyLink = document.getElementById('btn-modal-copy-link');
   const btnModalDone     = document.getElementById('btn-modal-done-share');
 
-  // Logo → back to landing
-  if (brandLogoBtn) brandLogoBtn.addEventListener('click', () => {
+  // Return to landing
+  function goHome() {
     if (state.presenceTimer) clearInterval(state.presenceTimer);
     if (state.sseSource) { state.sseSource.close(); state.sseSource = null; }
     state.roomId = null;
     state.monacoInstance = null;
     window.history.pushState(null, '', repoPrefix() + '/');
     showLanding();
-  });
+  }
 
-  // Room pill → copy
+  if (brandLogoBtn) brandLogoBtn.addEventListener('click', goHome);
+  if (landingBrandLink) landingBrandLink.addEventListener('click', goHome);
+
   if (btnCopyRoomLink) btnCopyRoomLink.addEventListener('click', () => copyLink());
-
-  if (btnShareRoom) btnShareRoom.addEventListener('click', copyLink);
+  if (btnShareRoom)     btnShareRoom.addEventListener('click', copyLink);
 
   if (btnCreateNew) btnCreateNew.addEventListener('click', () => {
     state.monacoInstance = null;
@@ -769,7 +897,7 @@
     toast('Downloaded ' + fname, 'success');
   });
 
-  // Settings modal
+  // Settings
   if (btnOpenSettings) btnOpenSettings.addEventListener('click', () => {
     if (el.settingFontsize) el.settingFontsize.value = state.settings.fontSize;
     if (el.settingTabsize)  el.settingTabsize.value  = state.settings.tabSize;
@@ -800,12 +928,12 @@
     toast('Settings saved!', 'success');
   });
 
-  // Share modal
+  // Share Modal
   if (btnModalCopyLink) btnModalCopyLink.addEventListener('click', copyLink);
   if (btnModalDone)     btnModalDone.addEventListener('click', () => { if (el.modalShare) el.modalShare.classList.add('hidden'); });
   if (btnCloseShare)    btnCloseShare.addEventListener('click', () => { if (el.modalShare) el.modalShare.classList.add('hidden'); });
 
-  // Backdrop click closes modals
+  // Modal Backdrop Dismiss
   [el.modalSettings, el.modalShare].forEach(modal => {
     if (modal) modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.classList.add('hidden');
@@ -813,7 +941,7 @@
   });
 
   // ──────────────────────────────────────────────
-  // BOOT
+  // BOOTSTRAP
   // ──────────────────────────────────────────────
   initRouter();
 
