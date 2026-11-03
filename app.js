@@ -674,17 +674,18 @@
   }
 
   // ──────────────────────────────────────────────
-  // OP-ART MOON & AIR-BREATHER RASTER WAVES CANVAS
-  // Live responsive raster lines with interactive breeze physics
+  // LIVING OP-ART RASTER & ASCII CANVAS ENGINE
+  // Full-screen generative scanline art, 3D volumetric moon,
+  // floating ASCII code particles, and responsive air-breather physics
   // ──────────────────────────────────────────────
   const mouseState = {
     x: window.innerWidth * 0.5,
-    y: window.innerHeight * 0.65,
+    y: window.innerHeight * 0.45,
     targetX: window.innerWidth * 0.5,
-    targetY: window.innerHeight * 0.65,
+    targetY: window.innerHeight * 0.45,
     speed: 0,
     prevX: window.innerWidth * 0.5,
-    prevY: window.innerHeight * 0.65,
+    prevY: window.innerHeight * 0.45,
     hasMoved: false
   };
 
@@ -710,196 +711,233 @@
     let W, H;
     let time = 0;
 
+    // Live ASCII moving code objects
+    const glyphs = ['0', '1', '<', '>', '{', '}', '*', '~', '+', '^', '/', '#', '$', '%', '&', '_', ';'];
+    let asciiParticles = [];
+
+    function initAsciiParticles() {
+      asciiParticles = Array.from({ length: 45 }, () => ({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        char: glyphs[Math.floor(Math.random() * glyphs.length)],
+        size: 9 + Math.random() * 6,
+        alpha: 0.15 + Math.random() * 0.45,
+        baseVx: (Math.random() - 0.5) * 0.35,
+        baseVy: -0.2 - Math.random() * 0.4,
+        phase: Math.random() * Math.PI * 2
+      }));
+    }
+
     function resize() {
       W = canvas.width  = window.innerWidth;
       H = canvas.height = window.innerHeight;
+      initAsciiParticles();
     }
 
     function render() {
       time += 0.016;
 
       // Mouse smoothing & velocity
-      mouseState.x += (mouseState.targetX - mouseState.x) * 0.07;
-      mouseState.y += (mouseState.targetY - mouseState.y) * 0.07;
+      mouseState.x += (mouseState.targetX - mouseState.x) * 0.08;
+      mouseState.y += (mouseState.targetY - mouseState.y) * 0.08;
       const mdx = mouseState.x - mouseState.prevX;
       const mdy = mouseState.y - mouseState.prevY;
       mouseState.speed = Math.hypot(mdx, mdy);
       mouseState.prevX = mouseState.x;
       mouseState.prevY = mouseState.y;
 
-      // Sky gradient — Deep midnight ocean teal
+      // ──────────────────────────────────────────────
+      // 1. SKY & HORIZON GRADIENT (Luminous Petrol-Teal Atmosphere)
+      // ──────────────────────────────────────────────
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0,    '#051117');
-      sky.addColorStop(0.35, '#081d26');
-      sky.addColorStop(0.65, '#0e2b37');
-      sky.addColorStop(1,    '#091c24');
+      sky.addColorStop(0,    '#05131b');
+      sky.addColorStop(0.35, '#0a232d');
+      sky.addColorStop(0.65, '#163c49');
+      sky.addColorStop(0.85, '#102d38');
+      sky.addColorStop(1,    '#07161e');
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
 
-      // Stars in upper sky
-      ctx.fillStyle = 'rgba(168, 236, 245, 0.45)';
-      for (let s = 0; s < 40; s++) {
-        const sx = (s * 137.5) % W;
-        const sy = (s * 93.3) % (H * 0.45);
-        const tw = 0.5 + 0.5 * Math.sin(time * 2 + s);
-        ctx.fillRect(sx, sy, 1.2, 1.2);
-      }
-
-      // Moon Geometry
+      // Moon center & radius (scales responsively)
+      const isMobile = W < 768;
       const moonX = W * 0.5;
-      const moonY = H * 0.28;
-      const moonR = Math.min(W, H) * 0.125;
+      const moonY = H * (isMobile ? 0.26 : 0.30);
+      const moonR = Math.min(W, H) * (isMobile ? 0.16 : 0.135);
 
-      // Moon outer radiant glow
-      const haloR = moonR * 3.8;
-      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.6, moonX, moonY, haloR);
-      halo.addColorStop(0,    'rgba(124, 226, 238, 0.18)');
-      halo.addColorStop(0.4,  'rgba(78, 205, 196, 0.08)');
-      halo.addColorStop(0.8,  'rgba(40, 110, 125, 0.02)');
-      halo.addColorStop(1,    'rgba(0, 0, 0, 0)');
+      // Luminous moonlight halo behind the line field
+      const haloR = moonR * 3.6;
+      const halo = ctx.createRadialGradient(moonX, moonY, moonR * 0.5, moonX, moonY, haloR);
+      halo.addColorStop(0,   'rgba(142, 236, 248, 0.22)');
+      halo.addColorStop(0.3, 'rgba(78, 205, 220, 0.10)');
+      halo.addColorStop(0.7, 'rgba(30, 100, 115, 0.03)');
+      halo.addColorStop(1,   'rgba(0, 0, 0, 0)');
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(moonX, moonY, haloR, 0, Math.PI * 2);
       ctx.fill();
 
-      // Moon spherical Op-Art raster lines
-      ctx.save();
+      // Soft moon core glow
+      const moonCore = ctx.createRadialGradient(moonX, moonY, moonR * 0.2, moonX, moonY, moonR);
+      moonCore.addColorStop(0,   'rgba(180, 245, 255, 0.20)');
+      moonCore.addColorStop(0.8, 'rgba(100, 215, 235, 0.10)');
+      moonCore.addColorStop(1,   'rgba(40, 120, 140, 0.02)');
+      ctx.fillStyle = moonCore;
       ctx.beginPath();
       ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
-      ctx.clip();
-
-      // Moon background disk
-      const moonDisc = ctx.createRadialGradient(
-        moonX - moonR * 0.2, moonY - moonR * 0.2, moonR * 0.1,
-        moonX, moonY, moonR
-      );
-      moonDisc.addColorStop(0,   '#d0f3f8');
-      moonDisc.addColorStop(0.6, '#86d4e0');
-      moonDisc.addColorStop(1,   '#3c8594');
-      ctx.fillStyle = moonDisc;
       ctx.fill();
 
-      // Moon crater shadows
-      const craters = [
-        [0.22, 0.18, 0.12], [-0.18, 0.30, 0.09], [0.05, -0.25, 0.08],
-        [-0.25, -0.15, 0.10], [0.32, -0.10, 0.06]
-      ];
-      ctx.fillStyle = 'rgba(25, 75, 88, 0.28)';
-      craters.forEach(([cx, cy, cr]) => {
-        ctx.beginPath();
-        ctx.arc(moonX + cx * moonR, moonY + cy * moonR, cr * moonR, 0, Math.PI * 2);
-        ctx.fill();
+      // ──────────────────────────────────────────────
+      // 2. LIVE FLOATING ASCII OBJECTS & CODE PARTICLES
+      // ──────────────────────────────────────────────
+      ctx.font = '500 11px "JetBrains Mono", monospace';
+      asciiParticles.forEach(p => {
+        p.x += p.baseVx + Math.sin(time + p.phase) * 0.25;
+        p.y += p.baseVy;
+        if (p.y < -20) { p.y = H + 20; p.x = Math.random() * W; }
+        if (p.x < -20) p.x = W + 20;
+        if (p.x > W + 20) p.x = -20;
+
+        // Interactive mouse repulsion for ASCII characters
+        const dMouse = Math.hypot(p.x - mouseState.x, p.y - mouseState.y);
+        if (dMouse < 180) {
+          const rep = (1 - dMouse / 180) * 3;
+          p.x += ((p.x - mouseState.x) / dMouse) * rep;
+          p.y += ((p.y - mouseState.y) / dMouse) * rep;
+        }
+
+        const tw = 0.5 + 0.5 * Math.sin(time * 2 + p.phase);
+        ctx.fillStyle = `rgba(124, 226, 238, ${p.alpha * tw * 0.75})`;
+        ctx.fillText(p.char, p.x, p.y);
       });
 
-      // Horizontal lines slicing through the Moon with 3D spherical lens bulging
-      const moonStep = 3.6;
-      ctx.lineWidth = 1.3;
-      for (let my = -moonR; my <= moonR; my += moonStep) {
-        const halfSpan = Math.sqrt(Math.max(0, moonR * moonR - my * my));
-        const lineY = moonY + my;
-
-        ctx.strokeStyle = 'rgba(7, 24, 32, 0.75)';
-        ctx.beginPath();
-        for (let mx = -halfSpan; mx <= halfSpan; mx += 2) {
-          const normX = mx / Math.max(1, halfSpan);
-          // Spherical lens bulging deformation
-          const bulge = Math.cos(normX * (Math.PI / 2)) * (my / moonR) * 3.5;
-          const px = moonX + mx;
-          const py = lineY + bulge;
-          if (mx === -halfSpan) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Atmospheric mist over moon horizon
-      const mistGrad = ctx.createLinearGradient(0, H * 0.38, 0, H * 0.52);
-      mistGrad.addColorStop(0, 'rgba(124, 226, 238, 0)');
-      mistGrad.addColorStop(0.5, 'rgba(78, 205, 196, 0.06)');
-      mistGrad.addColorStop(1, 'rgba(124, 226, 238, 0)');
-      ctx.fillStyle = mistGrad;
-      ctx.fillRect(0, H * 0.38, W, H * 0.14);
-
       // ──────────────────────────────────────────────
-      // RASTER WAVES FIELD (Landscape + Moving Air-Breather)
+      // 3. FULL-SCREEN OP-ART RASTER LINE FIELD
+      // Continuous fine parallel horizontal lines across the whole canvas.
+      // Lines deform in 3D around the moon sphere & undulate over the hills!
       // ──────────────────────────────────────────────
-      const startY = H * 0.44;
-      const numLines = Math.min(130, Math.floor((H - startY) / 3.8));
-      const xStep = Math.max(4, Math.floor(W / 140));
+      const lineStep = isMobile ? 4.5 : 3.8;
+      const totalLines = Math.floor(H / lineStep);
+      const xStep = Math.max(3, Math.floor(W / (isMobile ? 100 : 160)));
 
-      // Breathing harmonic expansion/contraction
-      const breathPhase = time * 0.9;
-      const breathPulse = Math.sin(breathPhase) * 6;
+      // Breathing harmonic waves
+      const breathTime = time * 0.85;
+      const breathAmp = Math.sin(breathTime) * 5;
 
       ctx.lineWidth = 1.15;
 
-      for (let i = 0; i < numLines; i++) {
-        const normI = i / numLines;
-        const baseLineY = startY + normI * (H - startY);
+      for (let i = 2; i < totalLines - 1; i++) {
+        const baseY = i * lineStep;
+        const normY = baseY / H;
 
-        // Color grading from misty horizon to deep bottom
-        const lightCatch = 0.35 + 0.65 * (1 - normI * 0.5);
-        const r = Math.round(78  + 46  * (1 - normI));
-        const g = Math.round(180 + 44  * (1 - normI));
-        const b = Math.round(200 + 38  * (1 - normI));
-        const alpha = Math.min(0.85, 0.25 + 0.6 * Math.pow(1 - normI, 0.7));
+        // Base line color: darker teal in sky, bright in moon/hills
+        let lineR = 30, lineG = 85, lineB = 105, lineA = 0.30;
+        if (normY > 0.45) {
+          const groundNorm = (normY - 0.45) / 0.55;
+          lineR = Math.round(55 + 65 * (1 - groundNorm * 0.6));
+          lineG = Math.round(145 + 75 * (1 - groundNorm * 0.5));
+          lineB = Math.round(175 + 65 * (1 - groundNorm * 0.5));
+          lineA = Math.min(0.85, 0.35 + 0.5 * Math.pow(1 - groundNorm, 0.7));
+        }
 
-        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.strokeStyle = `rgba(${lineR}, ${lineG}, ${lineB}, ${lineA})`;
         ctx.beginPath();
 
         let isFirst = true;
 
         for (let x = 0; x <= W + xStep; x += xStep) {
-          // Topographic hill elevations (harmonic Gaussian mounds)
-          const normX = x / W;
-          const h1 = Math.exp(-Math.pow((normX - 0.22) / 0.18, 2)) * H * 0.14;
-          const h2 = Math.exp(-Math.pow((normX - 0.76) / 0.22, 2)) * H * 0.19;
-          const h3 = Math.exp(-Math.pow((normX - 0.94) / 0.14, 2)) * H * 0.12;
-          const h4 = Math.exp(-Math.pow((normX - 0.46) / 0.15, 2)) * H * 0.06;
+          let y = baseY;
 
-          // Hill elevation fades towards bottom foreground
-          const hillFade = Math.pow(1 - normI, 1.6);
-          const terrainElevation = (h1 + h2 + h3 + h4) * hillFade;
+          // ── A. MOON 3D SPHERICAL DEFORMATION ──
+          const dxMoon = x - moonX;
+          const dyMoon = baseY - moonY;
+          const distMoon = Math.hypot(dxMoon, dyMoon);
 
-          // Living Air-Breather ambient wave
-          const ambientWave = (
-            Math.sin(normX * 12 + breathPhase) * 4.5 +
-            Math.sin(normX * 6  - breathPhase * 0.6) * 3 +
-            breathPulse * (1 - normI)
-          ) * (1 - normI * 0.6);
+          if (distMoon < moonR) {
+            // Inside the moon sphere — calculate 3D volumetric z-depth
+            const zNorm = Math.sqrt(Math.max(0, 1 - (distMoon / moonR) * (distMoon / moonR)));
+            // Spherical lens bulging
+            const lensBulge = -(zNorm) * (dyMoon / moonR) * (moonR * 0.42);
+            // Interactive mouse parallax tilt on the moon sphere
+            const tiltX = ((mouseState.x - moonX) / W) * 18 * zNorm;
+            const tiltY = ((mouseState.y - moonY) / H) * 22 * zNorm;
 
-          // Interactive Mouse Breeze / Air displacement
-          let mouseDisplacement = 0;
-          const distToMouse = Math.hypot(x - mouseState.x, baseLineY - mouseState.y);
+            y += lensBulge + tiltY;
+          }
+
+          // ── B. TOPOGRAPHIC HILLS (Lower 55% of canvas) ──
+          if (normY > 0.40) {
+            const normX = x / W;
+            const hillDepth = Math.pow((normY - 0.40) / 0.60, 1.4);
+
+            const h1 = Math.exp(-Math.pow((normX - 0.22) / 0.17, 2)) * H * 0.15;
+            const h2 = Math.exp(-Math.pow((normX - 0.76) / 0.23, 2)) * H * 0.21;
+            const h3 = Math.exp(-Math.pow((normX - 0.94) / 0.15, 2)) * H * 0.13;
+            const h4 = Math.exp(-Math.pow((normX - 0.46) / 0.16, 2)) * H * 0.07;
+
+            const elevation = (h1 + h2 + h3 + h4) * (1 - hillDepth);
+            const ambientRipple = (Math.sin(normX * 10 + breathTime) * 4 + breathAmp) * (1 - hillDepth * 0.7);
+
+            y -= (elevation + ambientRipple);
+          }
+
+          // ── C. MOUSE "AIR BREATHER" FLUID BREEZE ──
+          const distToMouse = Math.hypot(x - mouseState.x, y - mouseState.y);
           const breezeRadius = 260;
 
           if (distToMouse < breezeRadius) {
             const falloff = Math.cos((distToMouse / breezeRadius) * (Math.PI / 2));
-            // Outward travelling air ripple
-            const ripple = Math.sin(distToMouse * 0.045 - time * 3.5) * 14 * falloff;
-            // Downward breeze press
-            const breezePress = falloff * 16 * Math.min(2.0, 0.5 + mouseState.speed * 0.08);
-            mouseDisplacement = ripple + breezePress;
+            // Expanding air wave
+            const ripple = Math.sin(distToMouse * 0.045 - time * 3.8) * 16 * falloff;
+            // Downward breeze push with mouse speed dynamics
+            const breezePress = falloff * 18 * Math.min(2.0, 0.4 + mouseState.speed * 0.08);
+            y += ripple + breezePress;
           }
 
-          const curY = baseLineY - terrainElevation + ambientWave + mouseDisplacement;
-
           if (isFirst) {
-            ctx.moveTo(x, curY);
+            ctx.moveTo(x, y);
             isFirst = false;
           } else {
-            ctx.lineTo(x, curY);
+            ctx.lineTo(x, y);
           }
         }
         ctx.stroke();
+
+        // Extra highlight on the Moon lines for radiant luminous moon scanlines
+        const dyCenter = Math.abs(baseY - moonY);
+        if (dyCenter < moonR) {
+          const halfSpan = Math.sqrt(moonR * moonR - dyCenter * dyCenter);
+          const spanLeft = Math.max(0, moonX - halfSpan);
+          const spanRight = Math.min(W, moonX + halfSpan);
+
+          ctx.save();
+          ctx.strokeStyle = 'rgba(215, 248, 255, 0.88)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          let firstMoonPt = true;
+          for (let mx = spanLeft; mx <= spanRight; mx += xStep) {
+            const dxM = mx - moonX;
+            const dyM = baseY - moonY;
+            const distM = Math.hypot(dxM, dyM);
+            const zN = Math.sqrt(Math.max(0, 1 - (distM / moonR) * (distM / moonR)));
+            const bulge = -(zN) * (dyM / moonR) * (moonR * 0.42);
+            const tiltY = ((mouseState.y - moonY) / H) * 22 * zN;
+            const my = baseY + bulge + tiltY;
+
+            if (firstMoonPt) { ctx.moveTo(mx, my); firstMoonPt = false; }
+            else { ctx.lineTo(mx, my); }
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
-      // Silhouette tree groves along hilltops
-      ctx.fillStyle = '#06131a';
+      // ──────────────────────────────────────────────
+      // 4. SILHOUETTE TREE GROVES (Emerging between line ridges)
+      // ──────────────────────────────────────────────
+      ctx.fillStyle = '#06141c';
       const treeClusters = [
-        [0.17, 0.49], [0.20, 0.46], [0.23, 0.48], [0.26, 0.51],
-        [0.72, 0.46], [0.75, 0.43], [0.78, 0.45], [0.82, 0.48]
+        [0.17, 0.50], [0.20, 0.47], [0.23, 0.49], [0.26, 0.52],
+        [0.72, 0.47], [0.75, 0.44], [0.78, 0.46], [0.82, 0.49]
       ];
       treeClusters.forEach(([rx, ry]) => {
         const tx = rx * W;
@@ -914,6 +952,15 @@
         ctx.fill();
         ctx.fillRect(tx - 2, ty + 16, 4, 10);
       });
+
+      // Drifting mist atmospheric band
+      const mistX = (time * 15) % W;
+      const mistG = ctx.createLinearGradient(0, H * 0.42, 0, H * 0.56);
+      mistG.addColorStop(0, 'rgba(124, 226, 238, 0)');
+      mistG.addColorStop(0.5, 'rgba(78, 205, 220, 0.05)');
+      mistG.addColorStop(1, 'rgba(124, 226, 238, 0)');
+      ctx.fillStyle = mistG;
+      ctx.fillRect(0, H * 0.42, W, H * 0.14);
 
       state.canvasAnimId = requestAnimationFrame(render);
     }
