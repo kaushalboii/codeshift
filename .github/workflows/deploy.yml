@@ -34,6 +34,7 @@ jobs:
           cp robots.txt dist/
           cp README.md dist/
           cp -r public dist/
+          cp google*.html dist/ 2>/dev/null || true
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
