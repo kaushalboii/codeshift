@@ -228,7 +228,7 @@
     if (pfx && path.startsWith(pfx)) path = path.slice(pfx.length);
     path = path.replace(/^\/+/, '').trim();
 
-    if (path && path !== 'index.html' && path !== '404.html') {
+    if (path && path !== 'index.html' && path !== '404.html' && !path.startsWith('google') && !path.endsWith('.html')) {
       return decodeURIComponent(path);
     }
 

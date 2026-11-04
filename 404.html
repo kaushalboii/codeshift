@@ -18,7 +18,7 @@
       }
       route = route.replace(/^\/+/, '');
       
-      if (route && route !== 'index.html' && route !== '404.html') {
+      if (route && route !== 'index.html' && route !== '404.html' && !route.startsWith('google') && !route.endsWith('.html')) {
         sessionStorage.setItem('codeshift_room', route);
       }
       
