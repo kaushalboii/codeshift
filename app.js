@@ -24,6 +24,7 @@
     broadcastChannel: null,
     presenceTimer: null,
     saveTimer: null,
+    lastLocalEditTime: 0,
     isApplyingRemote: false,
     hasReceivedInitialRemote: false,
     monacoInstance: null,
@@ -580,18 +581,9 @@
         inputObserver.observe(el.monacoContainer, { childList: true, subtree: true });
       } catch (_) {}
 
-      // Cross-platform keybindings for both Mac (Control / Cmd) and Windows (Control)
-      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyA, () => selectAllCode());
-      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA, () => selectAllCode());
-
-      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyC, () => copyCurrentSelectionOrAll());
-      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => copyCurrentSelectionOrAll());
-
-      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyV, () => pasteFromClipboard());
-      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => pasteFromClipboard());
-
-      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyX, () => cutCurrentSelection());
-      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => cutCurrentSelection());
+      // Monaco natively handles Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X (and Cmd on Mac)
+      // with zero browser permission prompts. We do not intercept keyboard shortcuts,
+      // ensuring 100% unrestricted native clipboard and selection behavior.
 
       // Register custom Select All action with shortcut (⌘A / Ctrl+A) & Context Menu entry
       state.monacoInstance.addAction({
@@ -931,18 +923,29 @@
   }
 
   function applyRemote(code) {
-    if (code === getCode()) return;
+    if (code === undefined || code === null || code === getCode()) return;
+    // CRITICAL: If local user is actively typing within the last 1000ms, DO NOT overwrite!
+    // Prevents remote SSE echoes from stomping over fast typing (e.g. helloo -> loo bug)
+    if (Date.now() - state.lastLocalEditTime < 1000) return;
+
     state.isApplyingRemote = true;
     if (state.monacoInstance) {
-      const pos = state.monacoInstance.getPosition();
-      const top = state.monacoInstance.getScrollTop();
-      state.monacoInstance.setValue(code);
-      if (pos) state.monacoInstance.setPosition(pos);
-      if (top !== undefined) state.monacoInstance.setScrollTop(top);
+      const model = state.monacoInstance.getModel();
+      if (model) {
+        const pos = state.monacoInstance.getPosition();
+        const top = state.monacoInstance.getScrollTop();
+        // NON-DESTRUCTIVE: pushEditOperations replaces text cleanly without wiping active buffer
+        model.pushEditOperations(
+          [],
+          [{ range: model.getFullModelRange(), text: code }],
+          () => (pos ? [new monaco.Selection(pos.lineNumber, pos.column, pos.lineNumber, pos.column)] : null)
+        );
+        if (top !== undefined) state.monacoInstance.setScrollTop(top);
+      }
     } else if (el.editorTextarea) {
       el.editorTextarea.value = code;
     }
-    setTimeout(() => { state.isApplyingRemote = false; }, 120);
+    setTimeout(() => { state.isApplyingRemote = false; }, 150);
     const lines = (code || '').split('\n').length;
     if (el.codeStats) el.codeStats.textContent = lines + ' ' + (lines === 1 ? 'line' : 'lines');
   }
@@ -960,6 +963,7 @@
   // LOCAL CHANGE → encrypted PUT to Firebase
   // ──────────────────────────────────────────────
   function onLocalChange(code) {
+    state.lastLocalEditTime = Date.now();
     setSaveStatus('saving');
     playTick();
 
@@ -981,7 +985,7 @@
       })
       .then(() => setSaveStatus('saved'))
       .catch(() => setSaveStatus('saved'));
-    }, 280);
+    }, 450);
   }
 
   // ──────────────────────────────────────────────
@@ -994,7 +998,12 @@
       state.broadcastChannel.onmessage = (e) => {
         const m = e.data;
         if (!m || m.from === state.userId) return;
-        if (m.type === 'CODE' && m.roomId === roomId) applyRemote(m.code);
+        // Never interrupt active typing with local broadcast
+        if (m.type === 'CODE' && m.roomId === roomId) {
+          if (Date.now() - state.lastLocalEditTime >= 1000) {
+            applyRemote(m.code);
+          }
+        }
         if (m.type === 'PRESENCE') pollPresence(roomId);
         if (m.type === 'CURSOR') {
           renderRemoteCursor(m.from, m.name || 'Anonymous', m.color || '#10b981', m.line, m.col);
@@ -1010,14 +1019,19 @@
       const handleRemoteEvent = (ev) => {
         try {
           const p = JSON.parse(ev.data);
-          if (p && p.data && !state.isApplyingRemote) {
-            const raw = typeof p.data === 'string' ? p.data : (p.data.code !== undefined ? p.data.code : '');
-            if (typeof raw === 'string') {
-              const decoded = decryptPayload(raw, roomId);
-              applyRemote(decoded);
-              try { localStorage.setItem('codeshift_code_' + roomId, decoded); } catch (e) {}
-              setSaveStatus('saved');
-            }
+          if (!p || !p.data || state.isApplyingRemote) return;
+
+          // CRITICAL: Block Firebase SSE echoes of local user's own edits!
+          if (typeof p.data === 'object' && p.data.updatedBy === state.userId) return;
+          if (p.path === '/updatedBy' && p.data === state.userId) return;
+          if (Date.now() - state.lastLocalEditTime < 1000) return;
+
+          const raw = typeof p.data === 'string' ? p.data : (p.data.code !== undefined ? p.data.code : '');
+          if (typeof raw === 'string' && raw !== '') {
+            const decoded = decryptPayload(raw, roomId);
+            applyRemote(decoded);
+            try { localStorage.setItem('codeshift_code_' + roomId, decoded); } catch (e) {}
+            setSaveStatus('saved');
           }
         } catch (e) {}
       };
@@ -1132,9 +1146,9 @@
           const ts = typeof data.ts === 'number' ? data.ts : 0;
           const age = now - ts;
 
-          // Active heartbeat window: 20 seconds (pings sent every 3 seconds)
-          // Tolerate slight clock drift (-20000ms to +20000ms)
-          const isAlive = (age >= -20000 && age < 20000);
+          // Active heartbeat window: 9 seconds (heartbeat pings sent every 3 seconds)
+          // Tolerate slight clock drift (-5000ms to +9000ms)
+          const isAlive = (age >= -5000 && age < 9000);
 
           if (isAlive) {
             if (uid !== state.userId) {
@@ -1145,7 +1159,7 @@
               }
             }
           } else {
-            // Dead entry older than 20 seconds -> queue for deletion from Firebase
+            // Dead entry older than 9 seconds -> immediately queue for deletion from Firebase
             deadUids.push(uid);
           }
         });
@@ -1224,26 +1238,37 @@
     }).catch(() => {});
   }
 
-  // Instant presence cleanup & session duration record when tab is closed or reloaded
+  // Guaranteed instant presence cleanup when tab is closed or reloaded
+  function cleanupPresence() {
+    if (state.roomId && state.userId) {
+      const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/presence/' + state.userId + '.json';
+      try {
+        fetch(url, { method: 'DELETE', keepalive: true }).catch(() => {});
+      } catch (_) {}
+    }
+  }
+
   window.addEventListener('beforeunload', () => {
     if (state.userId) {
       const duration = Math.max(0, Math.round((Date.now() - sessionStartTime) / 1000));
       const url = FIREBASE_BASE + '/codeshare_rooms/_analytics/sessions/' + state.userId + '.json';
       try {
-        navigator.sendBeacon(url, JSON.stringify({
-          lastSeenAt: new Date().toISOString(),
-          durationSeconds: duration,
-          room: state.roomId || 'landing'
-        }));
+        fetch(url, {
+          method: 'PATCH',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lastSeenAt: new Date().toISOString(),
+            durationSeconds: duration,
+            room: state.roomId || 'landing'
+          })
+        }).catch(() => {});
       } catch (_) {}
     }
-    if (state.roomId && state.userId) {
-      const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/presence/' + state.userId + '.json';
-      try {
-        navigator.sendBeacon(url, JSON.stringify(null));
-      } catch (_) {}
-    }
+    cleanupPresence();
   });
+
+  window.addEventListener('pagehide', cleanupPresence);
 
   function setOnline(n, peerList = []) {
     if (el.onlineCount) el.onlineCount.textContent = n + ' online';
