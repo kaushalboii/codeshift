@@ -1185,6 +1185,25 @@ input, select, textarea {
   inset: 0;
   width: 100%;
   height: 100%;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+#monaco-editor-container .monaco-editor,
+#monaco-editor-container .view-lines,
+#monaco-editor-container .view-line,
+#monaco-editor-container .lines-content,
+#code-editor-textarea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* Ensure Monaco selection highlights stand out boldly */
+.monaco-editor .selected-text {
+  background-color: rgba(255, 255, 255, 0.28) !important;
+}
+.monaco-editor .focused .selected-text {
+  background-color: rgba(255, 255, 255, 0.35) !important;
 }
 
 /* BOTTOM PRO STATUS BAR */

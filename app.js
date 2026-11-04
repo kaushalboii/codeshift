@@ -474,6 +474,9 @@
         autoClosingBrackets: 'always',
         tabSize: state.settings.tabSize,
         wordWrap: state.settings.wordWrap ? 'on' : 'off',
+        selectOnLineNumbers: true,
+        selectionHighlight: true,
+        roundedSelection: false,
 
         // ── Autocomplete / Suggestions ──
         quickSuggestions: false,
@@ -488,6 +491,20 @@
           showWords: false,
           showFunctions: false,
           showVariables: false
+        }
+      });
+
+      // Register custom Select All action with shortcut (⌘A / Ctrl+A) & Context Menu entry
+      state.monacoInstance.addAction({
+        id: 'codeshift-action-select-all',
+        label: 'Select All',
+        keybindings: [
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA
+        ],
+        contextMenuGroupId: '9_cutcopypaste',
+        contextMenuOrder: 4,
+        run: function() {
+          selectAllCode();
         }
       });
 
@@ -678,23 +695,42 @@
     monaco.editor.defineTheme('codeshift-dark', {
       base: 'vs-dark', inherit: true,
       rules: [
-        { token: 'comment',  foreground: '436977', fontStyle: 'italic' },
-        { token: 'keyword',  foreground: '7ce2ee', fontStyle: 'bold' },
-        { token: 'string',   foreground: '5eead4' },
-        { token: 'number',   foreground: 'f59e0b' },
-        { token: 'type',     foreground: '38bdf8' },
-        { token: 'function', foreground: 'a5d8ff' }
+        { token: 'comment',  foreground: '666666', fontStyle: 'italic' },
+        { token: 'keyword',  foreground: 'ffffff', fontStyle: 'bold' },
+        { token: 'string',   foreground: 'd4d4d4' },
+        { token: 'number',   foreground: 'e5e5e5' },
+        { token: 'type',     foreground: 'ffffff', fontStyle: 'bold' },
+        { token: 'function', foreground: 'ffffff' }
       ],
       colors: {
-        'editor.background':                    '#06131a00',
-        'editor.foreground':                    '#f0fbfd',
-        'editorLineNumber.foreground':          '#214a57',
-        'editorLineNumber.activeForeground':    '#7ce2ee',
-        'editorCursor.foreground':              '#7ce2ee',
-        'editor.selectionBackground':           '#7ce2ee2a',
-        'editor.lineHighlightBackground':       '#0e2a3535'
+        'editor.background':                    '#000000',
+        'editor.foreground':                    '#ffffff',
+        'editorLineNumber.foreground':          '#444444',
+        'editorLineNumber.activeForeground':    '#ffffff',
+        'editorCursor.foreground':              '#ffffff',
+        'editor.selectionBackground':           '#ffffff40',
+        'editor.inactiveSelectionBackground':   '#ffffff22',
+        'editor.selectionHighlightBackground':  '#ffffff30',
+        'editor.lineHighlightBackground':       '#111111'
       }
     });
+  }
+
+  function selectAllCode() {
+    if (state.monacoInstance) {
+      state.monacoInstance.focus();
+      const model = state.monacoInstance.getModel();
+      if (model) {
+        const fullRange = model.getFullModelRange();
+        state.monacoInstance.setSelection(fullRange);
+        state.monacoInstance.revealRange(fullRange);
+      }
+      toast('All code selected', 'info');
+    } else if (el.editorTextarea) {
+      el.editorTextarea.focus();
+      el.editorTextarea.select();
+      toast('All code selected', 'info');
+    }
   }
 
   function getCode() {
@@ -1219,8 +1255,16 @@
   });
 
   // ── Pro IDE Workspace Controls ──
+  const btnSelectAll       = document.getElementById('btn-select-all');
   const btnQuickCopy       = document.getElementById('btn-quick-copy');
   const langSelectStatus   = document.getElementById('ide-status-lang-select');
+
+  // Select All Button in Top Bar (Desktop)
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener('click', () => {
+      selectAllCode();
+    });
+  }
 
   // Copy Code Button in Top Bar (Right next to Share)
   if (btnQuickCopy) {
@@ -1307,17 +1351,25 @@
   }
 
   // Mobile "More" Menu Toggle & Handlers
-  const btnMobMore   = document.getElementById('btn-mobile-more');
-  const mobMoreMenu  = document.getElementById('mobile-more-menu');
-  const btnMobNew    = document.getElementById('btn-mob-new');
-  const btnMobExport = document.getElementById('btn-mob-export');
-  const btnMobSet    = document.getElementById('btn-mob-settings');
+  const btnMobMore       = document.getElementById('btn-mobile-more');
+  const mobMoreMenu      = document.getElementById('mobile-more-menu');
+  const btnMobSelectAll  = document.getElementById('btn-mob-select-all');
+  const btnMobNew        = document.getElementById('btn-mob-new');
+  const btnMobExport     = document.getElementById('btn-mob-export');
+  const btnMobSet        = document.getElementById('btn-mob-settings');
 
   if (btnMobMore && mobMoreMenu) {
     btnMobMore.addEventListener('click', (e) => {
       e.stopPropagation();
       mobMoreMenu.classList.toggle('hidden');
     });
+
+    if (btnMobSelectAll) {
+      btnMobSelectAll.addEventListener('click', () => {
+        mobMoreMenu.classList.add('hidden');
+        selectAllCode();
+      });
+    }
 
     if (btnMobNew && btnCreateNew) {
       btnMobNew.addEventListener('click', () => {
@@ -1427,12 +1479,45 @@
     });
   });
 
-  // Keyboard Escape Dismiss
+  // Status Bar Telemetry Click-to-Select All
+  if (el.codeStats) {
+    el.codeStats.addEventListener('click', () => selectAllCode());
+  }
+  const charsCountEl = document.getElementById('code-chars-count');
+  if (charsCountEl) {
+    charsCountEl.addEventListener('click', () => selectAllCode());
+  }
+
+  // Universal Keyboard Shortcuts: Escape & Select All (Cmd+A / Ctrl+A)
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal(el.modalSettings);
       closeModal(el.modalShare);
       closeModal(el.modalPrivacy);
+      if (peersMenu) peersMenu.classList.add('hidden');
+      if (mobMoreMenu) mobMoreMenu.classList.add('hidden');
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
+      const activeEl = document.activeElement;
+      // Allow native select-all inside other inputs (e.g. nickname input, search input, share link)
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        if (activeEl.id === 'code-editor-textarea') {
+          e.preventDefault();
+          selectAllCode();
+          return;
+        }
+        if (!activeEl.closest('#monaco-editor-container')) {
+          return; // Let user select text inside normal inputs
+        }
+      }
+
+      // If we are currently in the editor view
+      if (el.editorView && !el.editorView.classList.contains('hidden')) {
+        e.preventDefault();
+        selectAllCode();
+      }
     }
   });
 
