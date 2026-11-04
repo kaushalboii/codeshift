@@ -38,11 +38,8 @@
   };
 
   function getUserIdentity() {
-    let uid = sessionStorage.getItem('codeshift_tab_uid');
-    if (!uid) {
-      uid = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-3);
-      sessionStorage.setItem('codeshift_tab_uid', uid);
-    }
+    // Generate distinct runtime UID per tab session so duplicated tabs or parallel windows never collide
+    const uid = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-4);
     let hash = 0;
     for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
     const anonNum = (hash % 89) + 11; // stable number e.g. 17
@@ -437,16 +434,18 @@
       defineTheme();
       if (el.monacoContainer) el.monacoContainer.innerHTML = '';
 
-      // Disable semantic error squiggles for clean note-taking & code writing
+      // Disable semantic & syntax error squiggles and auto-correct suggestions
       if (window.monaco && monaco.languages && monaco.languages.typescript) {
         try {
           monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
             noSemanticValidation: true,
-            noSyntaxValidation: false
+            noSyntaxValidation: true,
+            noSuggestionDiagnostics: true
           });
           monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
             noSemanticValidation: true,
-            noSyntaxValidation: false
+            noSyntaxValidation: true,
+            noSuggestionDiagnostics: true
           });
         } catch (_) {}
       }
@@ -470,36 +469,75 @@
         renderLineHighlight: 'all',
         cursorBlinking: 'smooth',
         smoothScrolling: true,
-        bracketPairColorization: { enabled: true },
-        autoClosingBrackets: 'always',
-        tabSize: state.settings.tabSize,
-        wordWrap: state.settings.wordWrap ? 'on' : 'off',
         selectOnLineNumbers: true,
         selectionHighlight: true,
         roundedSelection: false,
 
-        // ── Autocomplete / Suggestions ──
+        // ── Clean Indentation Only (Strictly No Auto-Correction) ──
+        autoIndent: 'full',
+        tabSize: state.settings.tabSize,
+        insertSpaces: true,
+        detectIndentation: false,
+        autoClosingBrackets: 'never',
+        autoClosingQuotes: 'never',
+        autoClosingDelete: 'never',
+        autoClosingOvertype: 'never',
+        autoSurround: 'never',
+        bracketPairColorization: { enabled: false },
+
+        // ── Strictly Disable Autocomplete, Snippets & Popups ──
         quickSuggestions: false,
         suggestOnTriggerCharacters: false,
         acceptSuggestionOnEnter: 'off',
+        acceptSuggestionOnCommitCharacter: 'off',
         tabCompletion: 'off',
-        wordBasedSuggestions: false,
+        wordBasedSuggestions: 'off',
+        snippetSuggestions: 'none',
         parameterHints: { enabled: false },
+        formatOnType: false,
+        formatOnPaste: false,
         suggest: {
           showKeywords: false,
           showSnippets: false,
           showWords: false,
           showFunctions: false,
-          showVariables: false
+          showVariables: false,
+          showClasses: false,
+          showModules: false,
+          showProperties: false,
+          showFields: false,
+          showInterfaces: false,
+          showMethods: false,
+          showValues: false,
+          showUnits: false,
+          showColors: false,
+          showFiles: false,
+          showReferences: false,
+          showFolders: false,
+          showTypeParameters: false
         }
       });
+
+      // Cross-platform keybindings for both Mac (Control / Cmd) and Windows (Control)
+      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyA, () => selectAllCode());
+      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA, () => selectAllCode());
+
+      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyC, () => copyCurrentSelectionOrAll());
+      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => copyCurrentSelectionOrAll());
+
+      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyV, () => pasteFromClipboard());
+      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => pasteFromClipboard());
+
+      state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyX, () => cutCurrentSelection());
+      state.monacoInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => cutCurrentSelection());
 
       // Register custom Select All action with shortcut (⌘A / Ctrl+A) & Context Menu entry
       state.monacoInstance.addAction({
         id: 'codeshift-action-select-all',
         label: 'Select All',
         keybindings: [
-          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA,
+          monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyA
         ],
         contextMenuGroupId: '9_cutcopypaste',
         contextMenuOrder: 4,
@@ -733,6 +771,98 @@
     }
   }
 
+  async function copyCurrentSelectionOrAll() {
+    let textToCopy = '';
+    if (state.monacoInstance) {
+      const selection = state.monacoInstance.getSelection();
+      if (selection && !selection.isEmpty()) {
+        const model = state.monacoInstance.getModel();
+        textToCopy = model ? model.getValueInRange(selection) : '';
+      } else {
+        textToCopy = state.monacoInstance.getValue();
+      }
+    } else if (el.editorTextarea) {
+      const start = el.editorTextarea.selectionStart;
+      const end = el.editorTextarea.selectionEnd;
+      if (start !== end) {
+        textToCopy = el.editorTextarea.value.substring(start, end);
+      } else {
+        textToCopy = el.editorTextarea.value;
+      }
+    }
+
+    if (!textToCopy) {
+      toast('Nothing to copy', 'info');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      toast('Copied to clipboard!', 'success');
+    } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = textToCopy;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('Copied to clipboard!', 'success');
+      } catch (err) {
+        toast('Failed to copy', 'error');
+      }
+    }
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      if (state.monacoInstance) {
+        const selection = state.monacoInstance.getSelection();
+        state.monacoInstance.executeEdits('clipboard', [{
+          range: selection,
+          text: text,
+          forceMoveMarkers: true
+        }]);
+        state.monacoInstance.pushUndoStop();
+        toast('Pasted!', 'success');
+      } else if (el.editorTextarea) {
+        const start = el.editorTextarea.selectionStart;
+        const end = el.editorTextarea.selectionEnd;
+        const val = el.editorTextarea.value;
+        el.editorTextarea.value = val.substring(0, start) + text + val.substring(end);
+        el.editorTextarea.selectionStart = el.editorTextarea.selectionEnd = start + text.length;
+        onLocalChange(el.editorTextarea.value);
+        toast('Pasted!', 'success');
+      }
+    } catch (err) {
+      if (state.monacoInstance) state.monacoInstance.focus();
+      else if (el.editorTextarea) el.editorTextarea.focus();
+    }
+  }
+
+  async function cutCurrentSelection() {
+    if (state.monacoInstance) {
+      const selection = state.monacoInstance.getSelection();
+      if (selection && !selection.isEmpty()) {
+        const model = state.monacoInstance.getModel();
+        const textToCut = model ? model.getValueInRange(selection) : '';
+        try {
+          await navigator.clipboard.writeText(textToCut);
+        } catch (_) {}
+        state.monacoInstance.executeEdits('clipboard', [{
+          range: selection,
+          text: '',
+          forceMoveMarkers: true
+        }]);
+        toast('Cut to clipboard', 'info');
+      }
+    }
+  }
+
   function getCode() {
     if (state.monacoInstance) return state.monacoInstance.getValue();
     return el.editorTextarea ? el.editorTextarea.value : '';
@@ -897,7 +1027,10 @@
         line: state.cursorLine || 1,
         col: state.cursorCol || 1
       })
+    }).then(() => {
+      pollPresence(roomId);
     }).catch(() => {});
+
     if (state.broadcastChannel) {
       try {
         state.broadcastChannel.postMessage({
@@ -913,19 +1046,26 @@
 
   function pollPresence(roomId) {
     if (!roomId) return;
-    fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence.json')
+    // Always bust cache so browsers never return stale peer counts
+    const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence.json?t=' + Date.now();
+    fetch(url, { cache: 'no-store' })
       .then(r => r.json())
       .then(map => {
-        if (!map) { setOnline(1, []); return; }
+        if (!map || typeof map !== 'object') {
+          setOnline(1, []);
+          return;
+        }
         const now = Date.now();
-        // 50 seconds TTL: keeps users online even if background tab throttles setInterval!
-        const activeEntries = Object.entries(map).filter(([uid, v]) => v && (now - v.ts) < 50000);
+        // 60 seconds TTL: reliable across mobile & desktop with background tab throttling
+        const activeEntries = Object.entries(map).filter(([uid, v]) => {
+          return v && typeof v === 'object' && v.ts && Math.abs(now - v.ts) < 60000;
+        });
 
         // Render collaborative cursors for active remote users
         const activeUids = new Set();
         const peers = [];
         activeEntries.forEach(([uid, data]) => {
-          if (uid === state.userId) return;
+          if (uid === state.userId) return; // Don't list ourselves in collaborator list
           peers.push(data);
           activeUids.add(uid);
           if (data && data.line) {
@@ -933,7 +1073,9 @@
           }
         });
 
-        setOnline(Math.max(1, activeEntries.length), peers);
+        // Total count = all active remote peers + 1 (local user)
+        const totalCount = peers.length + 1;
+        setOnline(totalCount, peers);
 
         // Clean up cursors for disconnected peers
         Object.keys(remoteCursors).forEach(uid => {
@@ -944,6 +1086,16 @@
       })
       .catch(() => setOnline(1, []));
   }
+
+  // Instant presence cleanup when tab is closed or reloaded
+  window.addEventListener('beforeunload', () => {
+    if (state.roomId && state.userId) {
+      const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/presence/' + state.userId + '.json';
+      try {
+        navigator.sendBeacon(url, JSON.stringify(null));
+      } catch (_) {}
+    }
+  });
 
   function setOnline(n, peerList = []) {
     if (el.onlineCount) el.onlineCount.textContent = n + ' online';
@@ -1000,17 +1152,17 @@
     t.textContent = msg;
     t.style.cssText = [
       'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9999',
-      'padding:11px 20px', 'border-radius:9px', 'font-size:13px',
-      'font-family:Inter,sans-serif', 'font-weight:600',
-      'background:' + (type === 'success' ? 'rgba(78,205,196,0.92)' : '#eb4d4b'),
-      'color:#06131a', 'box-shadow:0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(78,205,196,0.4)',
-      'transition:opacity 0.35s ease', 'opacity:1', 'backdrop-filter:blur(8px)'
+      'padding:9px 16px', 'border-radius:6px', 'font-size:12px',
+      'font-family:var(--cs-font-mono), monospace', 'font-weight:600',
+      'background:#111111', 'color:#ffffff', 'border:1px solid #333333',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.85)',
+      'transition:opacity 0.2s ease', 'opacity:1', 'pointer-events:none'
     ].join(';');
     document.body.appendChild(t);
     setTimeout(() => {
       t.style.opacity = '0';
-      setTimeout(() => t.remove(), 350);
-    }, 2200);
+      setTimeout(() => t.remove(), 200);
+    }, 1600);
   }
 
   function playTick() {
@@ -1488,7 +1640,7 @@
     charsCountEl.addEventListener('click', () => selectAllCode());
   }
 
-  // Universal Keyboard Shortcuts: Escape & Select All (Cmd+A / Ctrl+A)
+  // Universal Cross-Platform Keyboard Shortcuts (Control / Cmd for A, C, V, X)
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal(el.modalSettings);
@@ -1499,24 +1651,60 @@
       return;
     }
 
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
-      const activeEl = document.activeElement;
-      // Allow native select-all inside other inputs (e.g. nickname input, search input, share link)
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-        if (activeEl.id === 'code-editor-textarea') {
-          e.preventDefault();
-          selectAllCode();
-          return;
-        }
-        if (!activeEl.closest('#monaco-editor-container')) {
-          return; // Let user select text inside normal inputs
-        }
-      }
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (!isCtrlOrCmd) return;
 
-      // If we are currently in the editor view
+    const key = (e.key || '').toLowerCase();
+    const code = e.code || '';
+
+    // Allow standard input actions when typing inside inputs (nickname, room search, etc.)
+    const activeEl = document.activeElement;
+    const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
+                         activeEl.id !== 'code-editor-textarea' &&
+                         !activeEl.closest('#monaco-editor-container');
+
+    // ── Select All (Control+A / Cmd+A) ──
+    if (key === 'a' || code === 'KeyA') {
+      if (isOtherInput) return;
       if (el.editorView && !el.editorView.classList.contains('hidden')) {
         e.preventDefault();
         selectAllCode();
+      }
+    }
+
+    // ── Copy (Control+C / Cmd+C) ──
+    else if (key === 'c' || code === 'KeyC') {
+      if (isOtherInput) return;
+      if (el.editorView && !el.editorView.classList.contains('hidden')) {
+        // On Mac, Control+C is ignored natively; execute our copy!
+        if (e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          copyCurrentSelectionOrAll();
+        }
+      }
+    }
+
+    // ── Paste (Control+V / Cmd+V) ──
+    else if (key === 'v' || code === 'KeyV') {
+      if (isOtherInput) return;
+      if (el.editorView && !el.editorView.classList.contains('hidden')) {
+        // On Mac, Control+V is ignored natively; execute our paste!
+        if (e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          pasteFromClipboard();
+        }
+      }
+    }
+
+    // ── Cut (Control+X / Cmd+X) ──
+    else if (key === 'x' || code === 'KeyX') {
+      if (isOtherInput) return;
+      if (el.editorView && !el.editorView.classList.contains('hidden')) {
+        // On Mac, Control+X is ignored natively; execute our cut!
+        if (e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          cutCurrentSelection();
+        }
       }
     }
   });
