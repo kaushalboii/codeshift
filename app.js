@@ -1306,6 +1306,47 @@
     }
   }
 
+  // Mobile "More" Menu Toggle & Handlers
+  const btnMobMore   = document.getElementById('btn-mobile-more');
+  const mobMoreMenu  = document.getElementById('mobile-more-menu');
+  const btnMobNew    = document.getElementById('btn-mob-new');
+  const btnMobExport = document.getElementById('btn-mob-export');
+  const btnMobSet    = document.getElementById('btn-mob-settings');
+
+  if (btnMobMore && mobMoreMenu) {
+    btnMobMore.addEventListener('click', (e) => {
+      e.stopPropagation();
+      mobMoreMenu.classList.toggle('hidden');
+    });
+
+    if (btnMobNew && btnCreateNew) {
+      btnMobNew.addEventListener('click', () => {
+        mobMoreMenu.classList.add('hidden');
+        btnCreateNew.click();
+      });
+    }
+
+    if (btnMobExport && btnDownload) {
+      btnMobExport.addEventListener('click', () => {
+        mobMoreMenu.classList.add('hidden');
+        btnDownload.click();
+      });
+    }
+
+    if (btnMobSet && btnOpenSettings) {
+      btnMobSet.addEventListener('click', () => {
+        mobMoreMenu.classList.add('hidden');
+        btnOpenSettings.click();
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!mobMoreMenu.contains(e.target) && !btnMobMore.contains(e.target)) {
+        mobMoreMenu.classList.add('hidden');
+      }
+    });
+  }
+
   // Modal helpers — guaranteed to open/close cleanly
   function openModal(m) {
     if (!m) return;

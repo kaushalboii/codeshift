@@ -1102,6 +1102,63 @@ input, select, textarea {
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
 }
 
+/* Mobile More Menu */
+.mobile-more-wrapper {
+  display: none;
+  position: relative;
+}
+
+.mobile-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  width: 175px;
+  background: #0d0d0d;
+  border: 1px solid #282828;
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.95);
+  z-index: 100;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-dropdown-menu.hidden {
+  display: none !important;
+}
+
+.mobile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.mobile-menu-item:hover, .mobile-menu-item:active {
+  background: #1f1f1f;
+  color: #ffffff;
+}
+
+.mob-menu-icon {
+  font-size: 13px;
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+}
+
 /* WORKSPACE BODY — FULL SCREEN DISTRACTION-FREE */
 .ide-workspace-body {
   flex: 1;
@@ -1197,12 +1254,19 @@ input, select, textarea {
 
 /* Responsive Overrides */
 @media (max-width: 640px) {
+  .desktop-only-btn {
+    display: none !important;
+  }
+  .mobile-more-wrapper {
+    display: block !important;
+  }
   .ide-top-bar {
-    padding: 0 8px;
+    padding: 0 6px;
     gap: 4px;
   }
   .ide-top-left {
-    gap: 6px;
+    gap: 5px;
+    flex-shrink: 0;
   }
   .ide-brand-name {
     display: none !important;
@@ -1210,35 +1274,40 @@ input, select, textarea {
   .ide-room-pill {
     padding: 3px 6px;
     font-size: 11px;
-    max-width: 85px;
+    max-width: 75px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .ide-save-pill #save-status-text {
     display: none !important;
   }
   .ide-save-pill {
-    padding: 4px 6px;
+    padding: 4px 5px;
+    flex-shrink: 0;
   }
   .ide-presence-pill {
     padding: 3px 6px;
     font-size: 10px;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
   .ide-top-right {
     gap: 4px;
+    flex-shrink: 0;
   }
   .ide-action-btn {
-    padding: 4px 8px;
-    min-width: 30px;
+    padding: 4px 7px;
+    min-width: 28px;
     font-size: 11px;
   }
   .ide-action-btn span {
     display: none !important;
   }
   .ide-btn-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
   .peers-dropdown-menu {
     width: 240px;
