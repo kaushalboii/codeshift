@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="100%" height="100%">
+  <defs>
+    <!-- Background: Pure Pitch-Black Obsidian Void -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="45%" stop-color="#050505"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+
+    <!-- Subtle White Ambient Halo Filter -->
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <filter id="dotGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Headline Shift Gradient (Monochrome High Contrast) -->
+    <linearGradient id="shiftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#737373"/>
+    </linearGradient>
+
+    <!-- Terminal Window Drop Shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.95"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Deep Obsidian Pitch-Black Void -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- 2. Authentic 3D Monochrome Particle Wave Platform (Perspective Sine Waves + Glowing Dots) -->
+  <g opacity="0.35">
+    <!-- Wave Ribbon Ribs (Silver monochrome depth-fade) -->
+    <path d="M0,390 Q300,340 600,375 T1200,350" stroke="rgba(255,255,255,0.08)" stroke-width="0.8" fill="none"/>
+    <path d="M0,410 Q300,355 600,395 T1200,370" stroke="rgba(255,255,255,0.11)" stroke-width="0.8" fill="none"/>
+    <path d="M0,430 Q300,375 600,415 T1200,390" stroke="rgba(255,255,255,0.14)" stroke-width="0.9" fill="none"/>
+    <path d="M0,455 Q300,395 600,440 T1200,410" stroke="rgba(255,255,255,0.18)" stroke-width="1.0" fill="none"/>
+    <path d="M0,480 Q300,420 600,465 T1200,435" stroke="rgba(255,255,255,0.22)" stroke-width="1.1" fill="none"/>
+    <path d="M0,510 Q300,445 600,495 T1200,460" stroke="rgba(255,255,255,0.28)" stroke-width="1.2" fill="none"/>
+    <path d="M0,545 Q300,475 600,530 T1200,490" stroke="rgba(255,255,255,0.35)" stroke-width="1.3" fill="none"/>
+    <path d="M0,580 Q300,510 600,565 T1200,525" stroke="rgba(255,255,255,0.40)" stroke-width="1.4" fill="none"/>
+
+    <!-- Luminous Wave Particle Dots (Crests in glowing pure white, troughs in titanium silver) -->
+    <!-- Distant wave row dots -->
+    <g fill="#888888" opacity="0.4">
+      <circle cx="60" cy="385" r="1.2"/><circle cx="140" cy="370" r="1.2"/><circle cx="220" cy="355" r="1.3"/>
+      <circle cx="300" cy="342" r="1.4"/><circle cx="380" cy="346" r="1.4"/><circle cx="460" cy="358" r="1.3"/>
+      <circle cx="540" cy="368" r="1.3"/><circle cx="620" cy="376" r="1.3"/><circle cx="700" cy="372" r="1.3"/>
+      <circle cx="780" cy="365" r="1.4"/><circle cx="860" cy="358" r="1.4"/><circle cx="940" cy="352" r="1.3"/>
+      <circle cx="1020" cy="350" r="1.2"/><circle cx="1100" cy="350" r="1.2"/>
+    </g>
+
+    <!-- Mid-ground wave row dots -->
+    <g fill="#b0b0b0" opacity="0.6">
+      <circle cx="50" cy="450" r="1.5"/><circle cx="130" cy="430" r="1.6"/><circle cx="210" cy="410" r="1.8"/>
+      <circle cx="290" cy="397" r="2.0"/><circle cx="370" cy="405" r="1.9"/><circle cx="450" cy="420" r="1.8"/>
+      <circle cx="530" cy="432" r="1.7"/><circle cx="610" cy="442" r="1.7"/><circle cx="690" cy="435" r="1.8"/>
+      <circle cx="770" cy="425" r="1.9"/><circle cx="850" cy="418" r="1.9"/><circle cx="930" cy="412" r="1.7"/>
+      <circle cx="1010" cy="410" r="1.6"/><circle cx="1090" cy="410" r="1.5"/>
+    </g>
+
+    <!-- Foreground luminous wave crest dots (Signature CodeShift glowing particles) -->
+    <g fill="#ffffff" filter="url(#dotGlow)">
+      <circle cx="40" cy="540" r="2.0"/><circle cx="120" cy="515" r="2.3"/><circle cx="200" cy="492" r="2.6"/>
+      <circle cx="280" cy="478" r="3.0"/><circle cx="360" cy="490" r="2.8"/><circle cx="440" cy="508" r="2.5"/>
+      <circle cx="520" cy="522" r="2.4"/><circle cx="600" cy="530" r="2.4"/><circle cx="680" cy="520" r="2.5"/>
+      <circle cx="760" cy="505" r="2.8"/><circle cx="840" cy="495" r="2.9"/><circle cx="920" cy="490" r="2.6"/>
+      <circle cx="1000" cy="488" r="2.2"/><circle cx="1080" cy="489" r="2.0"/>
+    </g>
+  </g>
+
+  <!-- 3. Ambient Center Spotlight -->
+  <circle cx="600" cy="180" r="180" fill="#ffffff" opacity="0.03" filter="url(#softGlow)"/>
+
+  <!-- 4. Top Navigation Bar -->
+  <g transform="translate(60, 32)">
+    <!-- Brand Logo Mark: The [ >_ ] Terminal Tile -->
+    <rect x="0" y="0" width="28" height="28" rx="6" fill="#ffffff"/>
+    <path d="M8 9L14 14L8 19" stroke="#000000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="16" y1="19" x2="21" y2="19" stroke="#000000" stroke-width="2.4" stroke-linecap="round"/>
+
+    <!-- Brand Typography -->
+    <text x="40" y="21" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif" font-size="20" font-weight="800" fill="#ffffff" letter-spacing="-0.5">
+      Code<tspan fill="#a1a1aa">Shift</tspan>
+    </text>
+
+    <!-- Open Source Pill Badge -->
+    <rect x="156" y="3" width="160" height="22" rx="4" fill="#0d0d0d" stroke="#262626" stroke-width="1"/>
+    <text x="236" y="17.5" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="0.04em">OPEN SOURCE · V2.0</text>
+
+    <!-- GitHub Pill Button -->
+    <rect x="980" y="1" width="100" height="26" rx="6" fill="#000000" stroke="#ffffff" stroke-width="1"/>
+    <text x="1030" y="18" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="0.03em">GITHUB ↗</text>
+  </g>
+
+  <!-- 5. Hero Tagline Badge -->
+  <g transform="translate(600, 108)">
+    <rect x="-170" y="-13" width="340" height="26" rx="13" fill="#0d0d0d" stroke="#262626" stroke-width="1"/>
+    <circle cx="-145" cy="0" r="3.5" fill="#ffffff"/>
+    <text x="-132" y="3.5" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#ffffff" letter-spacing="0.12em">REAL-TIME CODE SHARING · NO LOGIN</text>
+  </g>
+
+  <!-- 6. Hero Headline -->
+  <text x="600" y="165" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="-1.2">
+    Code Together.
+  </text>
+  <text x="600" y="214" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="44" font-weight="800" fill="url(#shiftGrad)" text-anchor="middle" letter-spacing="-1.2">
+    Anywhere. Instantly.
+  </text>
+
+  <!-- Subtitle -->
+  <text x="600" y="248" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" font-size="14.5" fill="#888888" text-anchor="middle" letter-spacing="-0.2">
+    Open a room, share the URL. End-to-end encrypted collaborative editor with zero login friction.
+  </text>
+
+  <!-- 7. Unified Room Input Row (Matching the live aligned component) -->
+  <g transform="translate(370, 274)">
+    <!-- Container Pill -->
+    <rect width="460" height="44" rx="8" fill="#0d0d0d" stroke="#282828" stroke-width="1.5"/>
+    <text x="18" y="27" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="600" fill="#777777">codeshift /</text>
+    <text x="120" y="27" font-family="'JetBrains Mono', monospace" font-size="13" fill="#ffffff">my-room</text>
+    
+    <!-- Open Button -->
+    <rect x="375" y="5" width="80" height="34" rx="6" fill="#ffffff"/>
+    <text x="415" y="26" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" fill="#000000" text-anchor="middle">Open →</text>
+  </g>
+
+  <!-- 8. Real-Time Monaco Collaboration Window (With authentic macOS Dots & Active Peer Presence) -->
+  <g transform="translate(240, 342)" filter="url(#cardShadow)">
+    <!-- Outer Editor Card Container -->
+    <rect width="720" height="205" rx="10" fill="#0a0a0a" stroke="#222222" stroke-width="1.5"/>
+
+    <!-- Window Title Bar -->
+    <rect width="720" height="32" rx="10" fill="#111111"/>
+    
+    <!-- macOS Terminal Dots: Red, Yellow, Green (with subtle glow) -->
+    <circle cx="22" cy="16" r="5.5" fill="#ff5f57"/>
+    <circle cx="39" cy="16" r="5.5" fill="#ffbd2e"/>
+    <circle cx="56" cy="16" r="5.5" fill="#28c840"/>
+
+    <!-- Room Buffer Header Title -->
+    <text x="82" y="20" font-family="'JetBrains Mono', monospace" font-size="11" fill="#777777">codeshift/my-room · main.ts (Encrypted Buffer)</text>
+
+    <!-- Online Presence Pill Badge -->
+    <rect x="620" y="7" width="84" height="18" rx="4" fill="#000000" stroke="#2a2a2a"/>
+    <circle cx="632" cy="16" r="3" fill="#28c840"/>
+    <text x="642" y="19.5" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="600" fill="#ffffff">2 ONLINE</text>
+
+    <!-- Code Line 1: Comment -->
+    <text x="24" y="60" font-family="'JetBrains Mono', monospace" font-size="12" fill="#444444">1</text>
+    <text x="50" y="60" font-family="'JetBrains Mono', monospace" font-size="12" fill="#666666">// Client-side encrypted peer synchronization via AES-GCM</text>
+
+    <!-- Code Line 2: Active Collaborator Line with Tint & Anonymous 17 Cursor Badge (Screenshot 3 style) -->
+    <rect x="42" y="73" width="662" height="23" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-width="1" stroke-dasharray="0,662,23,0"/>
+    <text x="24" y="89" font-family="'JetBrains Mono', monospace" font-size="12" fill="#555555">2</text>
+    <text x="50" y="89" font-family="'JetBrains Mono', monospace" font-size="12" fill="#e2e8f0">
+      <tspan fill="#f43f5e" font-weight="600">export const </tspan><tspan fill="#38bdf8">session </tspan><tspan fill="#e2e8f0">= </tspan><tspan fill="#f43f5e" font-weight="600">await </tspan><tspan fill="#a855f7">CodeShift</tspan><tspan fill="#e2e8f0">.</tspan><tspan fill="#38bdf8">join</tspan><tspan fill="#e2e8f0">(</tspan><tspan fill="#10b981">"my-room"</tspan><tspan fill="#e2e8f0">);</tspan>
+    </text>
+
+    <!-- Remote Peer Cursor Tag: [ Anonymous 17 ] with Caret Line -->
+    <g transform="translate(435, 68)">
+      <rect x="0" y="0" width="102" height="18" rx="4" fill="#10b981"/>
+      <text x="51" y="12.5" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#000000" text-anchor="middle">Anonymous 17</text>
+      <!-- Caret pointing down onto line 2 -->
+      <polygon points="12,18 16,22 20,18" fill="#10b981"/>
+      <rect x="15" y="18" width="2" height="16" fill="#10b981"/>
+    </g>
+
+    <!-- Code Line 3: Reactive Sync Listener -->
+    <text x="24" y="118" font-family="'JetBrains Mono', monospace" font-size="12" fill="#444444">3</text>
+    <text x="50" y="118" font-family="'JetBrains Mono', monospace" font-size="12" fill="#e2e8f0">
+      <tspan fill="#38bdf8">session</tspan><tspan fill="#e2e8f0">.</tspan><tspan fill="#38bdf8">onSync</tspan><tspan fill="#e2e8f0">(({ </tspan><tspan fill="#f59e0b">code</tspan><tspan fill="#e2e8f0">, </tspan><tspan fill="#f59e0b">cursor</tspan><tspan fill="#e2e8f0"> }) =&gt; </tspan><tspan fill="#38bdf8">renderLive</tspan><tspan fill="#e2e8f0">(code));</tspan>
+    </text>
+
+    <!-- Code Line 4: Return & Blinking Cursor -->
+    <text x="24" y="147" font-family="'JetBrains Mono', monospace" font-size="12" fill="#444444">4</text>
+    <text x="50" y="147" font-family="'JetBrains Mono', monospace" font-size="12" fill="#e2e8f0">
+      <tspan fill="#f43f5e" font-weight="600">return </tspan><tspan fill="#5eead4">"collab ready ✓"</tspan><tspan fill="#e2e8f0">;</tspan>
+    </text>
+    <!-- White Terminal Blinking Caret -->
+    <rect x="238" y="136" width="7" height="14" fill="#ffffff"/>
+
+    <!-- Code Line 5: Closing Bracket -->
+    <text x="24" y="174" font-family="'JetBrains Mono', monospace" font-size="12" fill="#444444">5</text>
+    <text x="50" y="174" font-family="'JetBrains Mono', monospace" font-size="12" fill="#71717a">}</text>
+  </g>
+
+  <!-- 9. Minimal Footer Bar Simulation -->
+  <g transform="translate(0, 582)">
+    <rect width="1200" height="48" fill="#000000" stroke="#1c1c1c" stroke-width="1"/>
+    
+    <!-- Left Footer: Version -->
+    <text x="60" y="29" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="700" fill="#ffffff">CodeShift v2.0</text>
+    <text x="160" y="29" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11.5" fill="#777777">Zero logins, zero tracking, client-encrypted storage</text>
+    
+    <!-- Center Footer: Red Heart Attribution -->
+    <text x="600" y="29" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#888888" text-anchor="middle">
+      Developed &amp; maintained with <tspan fill="#ff3b30">❤️</tspan> by <tspan font-weight="700" fill="#ffffff">Kaushal</tspan>
+    </text>
+    
+    <!-- Right Footer: MIT License -->
+    <text x="1140" y="29" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="600" fill="#888888" text-anchor="end">MIT LICENSE</text>
+  </g>
+</svg>
