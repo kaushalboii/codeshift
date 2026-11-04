@@ -67,6 +67,12 @@
     })();
   </script>
 
+  <!-- Resource hints: pre-connect to CDNs used by Monaco and Firebase so DNS+TLS is resolved before they're needed -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://codeshift-realtimedb-default-rtdb.firebaseio.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://codeshift-realtimedb-default-rtdb.firebaseio.com">
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -123,6 +129,11 @@
       height: 100vh;
       pointer-events: none;
       z-index: 1;
+      will-change: transform;        /* promote to GPU compositing layer */
+    }
+
+    #monaco-editor-container {
+      will-change: contents;         /* GPU layer for editor text rendering */
     }
 
     /* Glass overlay for subtle depth & text readability — lightweight so canvas is vivid */
