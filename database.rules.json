@@ -1,0 +1,66 @@
+{
+  "rules": {
+    /* ─────────────────────────────────────────────────────────────
+       CODESHIFT PRODUCTION SECURITY RULES
+       - Blocks root read/write (prevents complete DB wipeout)
+       - Protects codeshare_rooms from deletion
+       - Caps code payloads to 500KB (stops payload flooding attacks)
+       - Auto-validates live presence and session telemetry
+       ───────────────────────────────────────────────────────────── */
+
+    /* Deny public root access */
+    ".read": false,
+    ".write": false,
+
+    "codeshare_rooms": {
+      /* Disallow listing or deleting all rooms */
+      ".read": false,
+      ".write": false,
+
+      /* Visitor time-tracking and anonymous session logs */
+      "_analytics": {
+        ".read": true,
+        ".write": false,
+        "sessions": {
+          ".read": true,
+          "$sessionId": {
+            /* Each visitor can create and update their own session telemetry */
+            ".write": "$sessionId.length > 0 && $sessionId.length <= 45",
+            ".validate": "newData.hasChildren(['joinedAt', 'lastSeenAt', 'durationSeconds', 'room']) && newData.child('durationSeconds').isNumber() && newData.child('durationSeconds').val() >= 0"
+          }
+        }
+      },
+
+      /* Individual collaboration room nodes */
+      "$roomId": {
+        /* Allow reading room if room ID is within 1-40 chars */
+        ".read": "$roomId.length > 0 && $roomId.length <= 40",
+
+        /* Code content node */
+        "data": {
+          ".read": "$roomId.length > 0 && $roomId.length <= 40",
+          ".write": "$roomId.length > 0 && $roomId.length <= 40",
+          /* Validation: ensures valid code payload up to 500,000 characters and valid timestamp */
+          ".validate": "newData.hasChildren(['code', 'ts']) && newData.child('code').isString() && newData.child('code').val().length <= 500000 && newData.child('ts').isNumber()"
+        },
+
+        /* Live collaborator presence */
+        "presence": {
+          ".read": "$roomId.length > 0 && $roomId.length <= 40",
+          "$userId": {
+            /* Collaborators can update presence or prune dead sessions */
+            ".write": "$userId.length > 0 && $userId.length <= 40",
+            ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber())"
+          }
+        },
+
+        /* Room metadata */
+        "meta": {
+          ".read": true,
+          ".write": "$roomId.length > 0 && $roomId.length <= 40",
+          ".validate": "newData.val() == null || newData.hasChildren(['createdAt'])"
+        }
+      }
+    }
+  }
+}

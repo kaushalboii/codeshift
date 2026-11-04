@@ -369,6 +369,7 @@
     loadMonacoThenInit(initial);
     syncSetup(roomId);
     presenceStart(roomId);
+    updateSessionDuration();
     setSaveStatus('saved');
   }
 
@@ -1120,8 +1121,70 @@
       .catch(() => setOnline(1, []));
   }
 
-  // Instant presence cleanup when tab is closed or reloaded
+  // ──────────────────────────────────────────────
+  // ANONYMOUS SESSION TIME TRACKING & VISITOR LOGS
+  // ──────────────────────────────────────────────
+  const sessionStartTime = Date.now();
+  let sessionHeartbeatTimer = null;
+
+  function getDeviceType() {
+    const ua = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(ua)) return 'iOS (Mobile)';
+    if (/Android/.test(ua)) return 'Android (Mobile)';
+    if (/Mac OS X/.test(ua)) return 'macOS (Desktop)';
+    if (/Windows/.test(ua)) return 'Windows (Desktop)';
+    if (/Linux/.test(ua)) return 'Linux (Desktop)';
+    return 'Other';
+  }
+
+  function initSessionTracking() {
+    const nowIso = new Date().toISOString();
+    const payload = {
+      joinedAt: nowIso,
+      lastSeenAt: nowIso,
+      durationSeconds: 0,
+      room: state.roomId || 'landing',
+      device: getDeviceType(),
+      referrer: document.referrer ? document.referrer.slice(0, 100) : 'Direct',
+      date: nowIso.slice(0, 10)
+    };
+
+    fetch(FIREBASE_BASE + '/codeshare_rooms/_analytics/sessions/' + state.userId + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+
+    if (sessionHeartbeatTimer) clearInterval(sessionHeartbeatTimer);
+    sessionHeartbeatTimer = setInterval(updateSessionDuration, 30000);
+  }
+
+  function updateSessionDuration() {
+    const duration = Math.max(0, Math.round((Date.now() - sessionStartTime) / 1000));
+    fetch(FIREBASE_BASE + '/codeshare_rooms/_analytics/sessions/' + state.userId + '.json', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lastSeenAt: new Date().toISOString(),
+        durationSeconds: duration,
+        room: state.roomId || 'landing'
+      })
+    }).catch(() => {});
+  }
+
+  // Instant presence cleanup & session duration record when tab is closed or reloaded
   window.addEventListener('beforeunload', () => {
+    if (state.userId) {
+      const duration = Math.max(0, Math.round((Date.now() - sessionStartTime) / 1000));
+      const url = FIREBASE_BASE + '/codeshare_rooms/_analytics/sessions/' + state.userId + '.json';
+      try {
+        navigator.sendBeacon(url, JSON.stringify({
+          lastSeenAt: new Date().toISOString(),
+          durationSeconds: duration,
+          room: state.roomId || 'landing'
+        }));
+      } catch (_) {}
+    }
     if (state.roomId && state.userId) {
       const url = FIREBASE_BASE + '/codeshare_rooms/' + safeKey(state.roomId) + '/presence/' + state.userId + '.json';
       try {
@@ -1747,5 +1810,6 @@
   // ──────────────────────────────────────────────
   updateUrlPrefix();
   initRouter();
+  initSessionTracking();
 
 })();
