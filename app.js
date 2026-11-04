@@ -454,9 +454,26 @@
       defineTheme();
       if (el.monacoContainer) el.monacoContainer.innerHTML = '';
 
-      // Disable semantic & syntax error squiggles and auto-correct suggestions
+      // Strip TypeScript & JavaScript workers of all auto-complete, hovers, diagnostics & auto-fixes
       if (window.monaco && monaco.languages && monaco.languages.typescript) {
         try {
+          const minimalMode = {
+            documentHighlight: false,
+            documentSymbol: false,
+            diagnostics: false,
+            completionItems: false,
+            hovers: false,
+            documentRangeFormattingEdits: false,
+            documentFormattingEdits: false,
+            tokens: true,
+            definitions: false,
+            references: false,
+            rename: false,
+            colors: false,
+            foldingRanges: true
+          };
+          monaco.languages.typescript.typescriptDefaults.setModeConfiguration(minimalMode);
+          monaco.languages.typescript.javascriptDefaults.setModeConfiguration(minimalMode);
           monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
             noSemanticValidation: true,
             noSyntaxValidation: true,
@@ -503,19 +520,23 @@
         autoClosingDelete: 'never',
         autoClosingOvertype: 'never',
         autoSurround: 'never',
+        autoClosingComments: 'never',
         bracketPairColorization: { enabled: false },
 
-        // ── Strictly Disable Autocomplete, Snippets & Popups ──
-        quickSuggestions: false,
+        // ── Strictly Disable Autocomplete, Ghost Suggestions, Snippets & Popups ──
+        quickSuggestions: { other: false, comments: false, strings: false },
         suggestOnTriggerCharacters: false,
         acceptSuggestionOnEnter: 'off',
         acceptSuggestionOnCommitCharacter: 'off',
         tabCompletion: 'off',
         wordBasedSuggestions: 'off',
         snippetSuggestions: 'none',
+        inlineSuggest: { enabled: false },
         parameterHints: { enabled: false },
         formatOnType: false,
         formatOnPaste: false,
+        renameOnType: false,
+        lightbulb: { enabled: false },
         suggest: {
           showKeywords: false,
           showSnippets: false,
@@ -534,9 +555,30 @@
           showFiles: false,
           showReferences: false,
           showFolders: false,
-          showTypeParameters: false
+          showTypeParameters: false,
+          showIssues: false,
+          showUsers: false
         }
       });
+
+      // Force-disable browser / OS / extension auto-correct on Monaco's internal input element
+      function sanitizeMonacoInput() {
+        if (!el.monacoContainer) return;
+        const inputs = el.monacoContainer.querySelectorAll('textarea, input');
+        inputs.forEach(inp => {
+          inp.setAttribute('spellcheck', 'false');
+          inp.setAttribute('autocorrect', 'off');
+          inp.setAttribute('autocapitalize', 'off');
+          inp.setAttribute('autocomplete', 'off');
+          inp.setAttribute('data-gramm', 'false');
+          inp.setAttribute('data-enable-grammarly', 'false');
+        });
+      }
+      sanitizeMonacoInput();
+      try {
+        const inputObserver = new MutationObserver(sanitizeMonacoInput);
+        inputObserver.observe(el.monacoContainer, { childList: true, subtree: true });
+      } catch (_) {}
 
       // Cross-platform keybindings for both Mac (Control / Cmd) and Windows (Control)
       state.monacoInstance.addCommand(monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyA, () => selectAllCode());
