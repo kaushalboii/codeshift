@@ -38,8 +38,17 @@
   };
 
   function getUserIdentity() {
-    // Generate distinct runtime UID per tab session so duplicated tabs or parallel windows never collide
-    const uid = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-4);
+    // Stable tab identity: persists across refreshes so refreshing never spawns phantom users!
+    if (!window.name || !window.name.startsWith('cs_tab_')) {
+      window.name = 'cs_tab_' + Math.random().toString(36).substring(2, 10);
+    }
+    const tabKey = 'codeshift_uid_' + window.name;
+    let uid = sessionStorage.getItem(tabKey);
+    if (!uid) {
+      uid = 'usr_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-3);
+      sessionStorage.setItem(tabKey, uid);
+    }
+
     let hash = 0;
     for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
     const anonNum = (hash % 89) + 11; // stable number e.g. 17
@@ -1081,8 +1090,9 @@
           const ts = typeof data.ts === 'number' ? data.ts : 0;
           const age = now - ts;
 
-          // Tolerate clock skew between phones & laptops up to 3 minutes (-180000ms to +180000ms)
-          const isAlive = (age >= -180000 && age < 180000);
+          // Active heartbeat window: 20 seconds (pings sent every 3 seconds)
+          // Tolerate slight clock drift (-20000ms to +20000ms)
+          const isAlive = (age >= -20000 && age < 20000);
 
           if (isAlive) {
             if (uid !== state.userId) {
@@ -1093,7 +1103,7 @@
               }
             }
           } else {
-            // Dead entry older than 3 minutes -> queue for deletion from Firebase
+            // Dead entry older than 20 seconds -> queue for deletion from Firebase
             deadUids.push(uid);
           }
         });
