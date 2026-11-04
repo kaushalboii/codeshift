@@ -997,7 +997,7 @@
     state.presenceTimer = setInterval(() => {
       presencePing(roomId);
       pollPresence(roomId);
-    }, 4000);
+    }, 3000);
   }
 
   // Ping immediately when user focuses tab or visibility changes
@@ -1056,26 +1056,45 @@
           return;
         }
         const now = Date.now();
-        // 60 seconds TTL: reliable across mobile & desktop with background tab throttling
-        const activeEntries = Object.entries(map).filter(([uid, v]) => {
-          return v && typeof v === 'object' && v.ts && Math.abs(now - v.ts) < 60000;
-        });
 
-        // Render collaborative cursors for active remote users
-        const activeUids = new Set();
+        // Separate active users vs dead users
         const peers = [];
-        activeEntries.forEach(([uid, data]) => {
-          if (uid === state.userId) return; // Don't list ourselves in collaborator list
-          peers.push(data);
-          activeUids.add(uid);
-          if (data && data.line) {
-            renderRemoteCursor(uid, data.name || 'Anonymous', data.color || '#10b981', data.line, data.col || 1);
+        const activeUids = new Set();
+        const deadUids = [];
+
+        Object.entries(map).forEach(([uid, data]) => {
+          if (!data || typeof data !== 'object') {
+            deadUids.push(uid);
+            return;
+          }
+          const ts = typeof data.ts === 'number' ? data.ts : 0;
+          const age = now - ts;
+
+          // Tolerate clock skew between phones & laptops up to 3 minutes (-180000ms to +180000ms)
+          const isAlive = (age >= -180000 && age < 180000);
+
+          if (isAlive) {
+            if (uid !== state.userId) {
+              peers.push(data);
+              activeUids.add(uid);
+              if (data.line) {
+                renderRemoteCursor(uid, data.name || 'Anonymous', data.color || '#10b981', data.line, data.col || 1);
+              }
+            }
+          } else {
+            // Dead entry older than 3 minutes -> queue for deletion from Firebase
+            deadUids.push(uid);
           }
         });
 
-        // Total count = all active remote peers + 1 (local user)
-        const totalCount = peers.length + 1;
-        setOnline(totalCount, peers);
+        // Automatically delete dead/stale records from Firebase so the database never accumulates old junk!
+        if (deadUids.length > 0) {
+          deadUids.forEach(deadUid => {
+            fetch(FIREBASE_BASE + '/codeshare_rooms/' + safeKey(roomId) + '/presence/' + deadUid + '.json', {
+              method: 'DELETE'
+            }).catch(() => {});
+          });
+        }
 
         // Clean up cursors for disconnected peers
         Object.keys(remoteCursors).forEach(uid => {
@@ -1083,6 +1102,10 @@
             removeRemoteCursor(uid);
           }
         });
+
+        // Total count = 1 (local user) + count of active remote peers
+        const totalCount = peers.length + 1;
+        setOnline(totalCount, peers);
       })
       .catch(() => setOnline(1, []));
   }
